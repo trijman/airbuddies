@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Airbuddies"
+version = "1.0.0"
+id = "artifacts/airbuddies"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 18332
+
+[services.development]
+run = "pnpm --filter @workspace/airbuddies run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/airbuddies", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/airbuddies", "run", "serve" ]
+
+[services.env]
+PORT = "18332"
+BASE_PATH = "/"
