@@ -26,25 +26,19 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="chat/[id]"
-        options={{
-          headerShown: false,
-          animation: "slide_from_right",
-        }}
+        options={{ headerShown: false, animation: "slide_from_right" }}
       />
       <Stack.Screen
         name="profile/[id]"
-        options={{
-          headerShown: false,
-          animation: "slide_from_right",
-        }}
+        options={{ headerShown: false, animation: "slide_from_right" }}
       />
       <Stack.Screen
         name="new-group"
-        options={{
-          headerShown: false,
-          animation: "slide_from_bottom",
-          presentation: "modal",
-        }}
+        options={{ headerShown: false, animation: "slide_from_bottom", presentation: "modal" }}
+      />
+      <Stack.Screen
+        name="edit-profile"
+        options={{ headerShown: false, animation: "slide_from_bottom", presentation: "modal" }}
       />
     </Stack>
   );

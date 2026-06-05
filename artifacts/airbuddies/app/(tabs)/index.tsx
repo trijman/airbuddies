@@ -57,19 +57,21 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
 
   const lastMsg = conv.lastMessage;
   const preview = lastMsg
-    ? lastMsg.senderId === profile?.id
+    ? lastMsg.type === "contact-card"
+      ? "📇 Contactkaart"
+      : lastMsg.senderId === profile?.id
       ? `Jij: ${lastMsg.content}`
       : lastMsg.content
     : "Geen berichten";
+
+  const isFlight = !!conv.flightNumber;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
       <Pressable
         style={({ pressed }) => [
           styles.convItem,
-          {
-            backgroundColor: pressed ? colors.muted : colors.card,
-          },
+          { backgroundColor: pressed ? colors.muted : colors.card },
         ]}
         onPress={() => router.push(`/chat/${conv.id}`)}
         testID={`conv-item-${conv.id}`}
@@ -85,46 +87,52 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
         />
         <View style={styles.convInfo}>
           <View style={styles.convHeader}>
-            <Text
-              style={[
-                styles.convName,
-                {
-                  color: colors.foreground,
-                  fontFamily:
-                    conv.unreadCount > 0 ? "Inter_700Bold" : "Inter_600SemiBold",
-                },
-              ]}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
+            <View style={styles.convNameRow}>
+              {isFlight && (
+                <Ionicons name="airplane" size={13} color={colors.primary} style={{ marginRight: 3 }} />
+              )}
+              {conv.isPrivate && conv.type === "group" && !isFlight && (
+                <Ionicons name="lock-closed" size={12} color={colors.nearby} style={{ marginRight: 3 }} />
+              )}
+              <Text
+                style={[
+                  styles.convName,
+                  {
+                    color: colors.foreground,
+                    fontFamily: conv.unreadCount > 0 ? "Inter_700Bold" : "Inter_600SemiBold",
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+            </View>
             <Text
               style={[
                 styles.convTime,
                 {
-                  color:
-                    conv.unreadCount > 0
-                      ? colors.primary
-                      : colors.mutedForeground,
-                  fontFamily:
-                    conv.unreadCount > 0 ? "Inter_600SemiBold" : "Inter_400Regular",
+                  color: conv.unreadCount > 0 ? colors.primary : colors.mutedForeground,
+                  fontFamily: conv.unreadCount > 0 ? "Inter_600SemiBold" : "Inter_400Regular",
                 },
               ]}
             >
               {lastMsg ? formatTime(lastMsg.timestamp) : ""}
             </Text>
           </View>
+
+          {isFlight && (
+            <Text style={[styles.flightTag, { color: colors.primary }]}>
+              {conv.flightNumber}
+            </Text>
+          )}
+
           <View style={styles.convPreview}>
             <Text
               style={[
                 styles.convMsg,
                 {
-                  color:
-                    conv.unreadCount > 0
-                      ? colors.foreground
-                      : colors.mutedForeground,
-                  fontFamily:
-                    conv.unreadCount > 0 ? "Inter_500Medium" : "Inter_400Regular",
+                  color: conv.unreadCount > 0 ? colors.foreground : colors.mutedForeground,
+                  fontFamily: conv.unreadCount > 0 ? "Inter_500Medium" : "Inter_400Regular",
                 },
               ]}
               numberOfLines={1}
@@ -132,9 +140,7 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
               {preview}
             </Text>
             {conv.unreadCount > 0 && (
-              <View
-                style={[styles.badge, { backgroundColor: colors.primary }]}
-              >
+              <View style={[styles.badge, { backgroundColor: colors.primary }]}>
                 <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
                   {conv.unreadCount}
                 </Text>
@@ -152,8 +158,13 @@ export default function ChatsScreen() {
   const insets = useSafeAreaInsets();
   const { conversations } = useApp();
   const isWeb = Platform.OS === "web";
-
   const topPad = isWeb ? 67 : insets.top;
+
+  const sorted = [...conversations].sort(
+    (a, b) =>
+      (b.lastMessage?.timestamp ?? b.createdAt) -
+      (a.lastMessage?.timestamp ?? a.createdAt)
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -167,9 +178,7 @@ export default function ChatsScreen() {
           },
         ]}
       >
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          Airbuddies
-        </Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>Airbuddies</Text>
         <Pressable
           style={[styles.newChatBtn, { backgroundColor: colors.primary }]}
           onPress={() => router.push("/new-group")}
@@ -180,47 +189,26 @@ export default function ChatsScreen() {
       </View>
 
       <FlatList
-        data={conversations.sort(
-          (a, b) =>
-            (b.lastMessage?.timestamp ?? b.createdAt) -
-            (a.lastMessage?.timestamp ?? a.createdAt)
-        )}
+        data={sorted}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <ConvItem conv={item} index={index} />
-        )}
+        renderItem={({ item, index }) => <ConvItem conv={item} index={index} />}
         contentContainerStyle={[
           styles.list,
           isWeb ? { paddingBottom: 34 } : undefined,
         ]}
-        scrollEnabled={!!conversations.length}
+        scrollEnabled={!!sorted.length}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons
-              name="chatbubbles-outline"
-              size={56}
-              color={colors.mutedForeground}
-            />
-            <Text
-              style={[styles.emptyTitle, { color: colors.foreground }]}
-            >
-              Geen gesprekken
-            </Text>
-            <Text
-              style={[styles.emptySubtitle, { color: colors.mutedForeground }]}
-            >
-              Ga naar Discover om buddies te vinden
+            <Ionicons name="chatbubbles-outline" size={56} color={colors.mutedForeground} />
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Geen gesprekken</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+              Maak een vluchtgroep of ga naar Discover
             </Text>
           </View>
         }
         ItemSeparatorComponent={() => (
-          <View
-            style={[
-              styles.separator,
-              { backgroundColor: colors.border, marginLeft: 80 },
-            ]}
-          />
+          <View style={[styles.separator, { backgroundColor: colors.border, marginLeft: 80 }]} />
         )}
       />
     </View>
@@ -237,17 +225,10 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.5,
-  },
+  title: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
   newChatBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
   },
   list: { flexGrow: 1 },
   convItem: {
@@ -257,14 +238,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
-  convInfo: { flex: 1, gap: 3 },
+  convInfo: { flex: 1, gap: 2 },
   convHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
+  convNameRow: { flexDirection: "row", alignItems: "center", flex: 1 },
   convName: { fontSize: 16, flex: 1 },
   convTime: { fontSize: 12 },
+  flightTag: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   convPreview: {
     flexDirection: "row",
     alignItems: "center",
@@ -272,13 +256,9 @@ const styles = StyleSheet.create({
   },
   convMsg: { fontSize: 14, flex: 1 },
   badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 5,
-    marginLeft: 4,
+    minWidth: 20, height: 20, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 5, marginLeft: 4,
   },
   badgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   separator: { height: StyleSheet.hairlineWidth },

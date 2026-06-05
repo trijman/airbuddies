@@ -1,19 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React from "react";
 import {
   Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/Avatar";
+import { InterestChip } from "@/components/InterestChip";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -24,15 +26,16 @@ interface SettingRowProps {
   value?: string;
   onPress?: () => void;
   danger?: boolean;
+  right?: React.ReactNode;
 }
 
-function SettingRow({ icon, iconColor, label, value, onPress, danger }: SettingRowProps) {
+function SettingRow({ icon, iconColor, label, value, onPress, danger, right }: SettingRowProps) {
   const colors = useColors();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.settingRow,
-        { backgroundColor: pressed ? colors.muted : colors.card },
+        { backgroundColor: pressed && onPress ? colors.muted : colors.card },
       ]}
       onPress={onPress}
     >
@@ -49,11 +52,10 @@ function SettingRow({ icon, iconColor, label, value, onPress, danger }: SettingR
       </Text>
       <View style={styles.settingRight}>
         {value && (
-          <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>
-            {value}
-          </Text>
+          <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{value}</Text>
         )}
-        {onPress && (
+        {right}
+        {onPress && !right && (
           <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
         )}
       </View>
@@ -64,20 +66,9 @@ function SettingRow({ icon, iconColor, label, value, onPress, danger }: SettingR
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useApp();
-  const [editing, setEditing] = useState(false);
-  const [nameInput, setNameInput] = useState(profile?.name ?? "");
+  const { profile, toggleVisibility } = useApp();
   const isWeb = Platform.OS === "web";
-
   const topPad = isWeb ? 67 : insets.top;
-
-  const saveName = () => {
-    if (nameInput.trim()) {
-      updateProfile(nameInput.trim());
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    setEditing(false);
-  };
 
   const fp = profile?.fingerprint ?? "";
   const fpDisplay = fp.slice(0, 11) + "..." + fp.slice(-5);
@@ -85,58 +76,84 @@ export default function SettingsScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={[
-        styles.scroll,
-        isWeb ? { paddingBottom: 34 } : undefined,
-      ]}
+      contentContainerStyle={[styles.scroll, isWeb ? { paddingBottom: 34 } : undefined]}
       showsVerticalScrollIndicator={false}
     >
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: topPad + 8,
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Instellingen</Text>
       </View>
 
-      <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Avatar name={profile?.name ?? "Ik"} size={72} />
+      <Pressable
+        style={({ pressed }) => [
+          styles.profileCard,
+          { backgroundColor: pressed ? colors.muted : colors.card, borderColor: colors.border },
+        ]}
+        onPress={() => router.push("/edit-profile")}
+        testID="profile-edit-button"
+      >
+        <Avatar name={profile?.name ?? "Ik"} size={64} seed={profile?.avatarSeed ?? profile?.name} />
         <View style={styles.profileInfo}>
-          {editing ? (
-            <View style={styles.editRow}>
-              <TextInput
-                value={nameInput}
-                onChangeText={setNameInput}
-                style={[
-                  styles.nameInput,
-                  {
-                    color: colors.foreground,
-                    borderColor: colors.primary,
-                    backgroundColor: colors.muted,
-                  },
-                ]}
-                autoFocus
-                onSubmitEditing={saveName}
-                returnKeyType="done"
-              />
-              <Pressable onPress={saveName}>
-                <Ionicons name="checkmark-circle" size={28} color={colors.primary} />
-              </Pressable>
-            </View>
+          <Text style={[styles.profileName, { color: colors.foreground }]}>
+            {profile?.name ?? "Mijn profiel"}
+          </Text>
+          {profile?.bio ? (
+            <Text style={[styles.profileBio, { color: colors.mutedForeground }]} numberOfLines={2}>
+              {profile.bio}
+            </Text>
           ) : (
-            <Pressable style={styles.nameRow} onPress={() => setEditing(true)}>
-              <Text style={[styles.profileName, { color: colors.foreground }]}>
-                {profile?.name ?? "Ik"}
-              </Text>
-              <Ionicons name="pencil" size={16} color={colors.mutedForeground} />
-            </Pressable>
+            <Text style={[styles.profileBio, { color: colors.primary }]}>
+              Profiel aanvullen →
+            </Text>
           )}
-          <Text style={[styles.profileFp, { color: colors.mutedForeground }]}>
-            {fpDisplay}
+          {(profile?.interests?.length ?? 0) > 0 && (
+            <View style={styles.interestRow}>
+              {profile!.interests.slice(0, 3).map((i) => (
+                <InterestChip key={i} label={i} selected small />
+              ))}
+              {profile!.interests.length > 3 && (
+                <Text style={[styles.moreInterests, { color: colors.mutedForeground }]}>
+                  +{profile!.interests.length - 3}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+      </Pressable>
+
+      {profile?.seatNumber && (
+        <View style={[styles.seatBanner, { backgroundColor: colors.secondary, borderColor: colors.primary + "44" }]}>
+          <Ionicons name="airplane-outline" size={18} color={colors.primary} />
+          <Text style={[styles.seatText, { color: colors.primary }]}>
+            Jouw stoel: <Text style={{ fontFamily: "Inter_700Bold" }}>{profile.seatNumber}</Text>
+          </Text>
+        </View>
+      )}
+
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Zichtbaarheid</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <SettingRow
+          icon={profile?.isVisible ? "eye-outline" : "eye-off-outline"}
+          iconColor={profile?.isVisible ? colors.success : colors.mutedForeground}
+          label={profile?.isVisible ? "Profiel zichtbaar" : "Onzichtbaar"}
+          right={
+            <Switch
+              value={profile?.isVisible ?? true}
+              onValueChange={() => {
+                Haptics.selectionAsync();
+                toggleVisibility();
+              }}
+              trackColor={{ false: colors.muted, true: colors.success }}
+              thumbColor="#ffffff"
+            />
+          }
+        />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <View style={styles.visHint}>
+          <Text style={[styles.visHintText, { color: colors.mutedForeground }]}>
+            {profile?.isVisible
+              ? "Anderen kunnen jou zien in Discover en in groepschats."
+              : "Je bent onzichtbaar. Je kunt niet deelnemen aan openbare chats."}
           </Text>
         </View>
       </View>
@@ -146,12 +163,9 @@ export default function SettingsScreen() {
         <SettingRow
           icon="shield-checkmark-outline"
           iconColor={colors.primary}
-          label="Fingerprint tonen"
-          onPress={() =>
-            Alert.alert("Jouw fingerprint", profile?.fingerprint ?? "", [
-              { text: "Sluiten" },
-            ])
-          }
+          label="Fingerprint"
+          value={fpDisplay}
+          onPress={() => Alert.alert("Jouw fingerprint", profile?.fingerprint ?? "")}
         />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <SettingRow
@@ -163,8 +177,8 @@ export default function SettingsScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <SettingRow
           icon="eye-off-outline"
-          iconColor={colors.accentForeground}
-          label="Protocol"
+          iconColor={colors.accent}
+          label="Algoritme"
           value="ChaCha20-Poly1305"
         />
       </View>
@@ -195,24 +209,15 @@ export default function SettingsScreen() {
 
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Over</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingRow
-          icon="information-circle-outline"
-          iconColor={colors.primary}
-          label="Versie"
-          value="1.0.0"
-        />
+        <SettingRow icon="information-circle-outline" iconColor={colors.primary} label="Versie" value="1.0.0" />
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <SettingRow
-          icon="heart-outline"
-          iconColor={colors.destructive}
-          label="Gebaseerd op Bitchat protocol"
-        />
+        <SettingRow icon="heart-outline" iconColor={colors.destructive} label="Gebaseerd op Bitchat protocol" />
       </View>
 
       <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.primary + "33" }]}>
         <Ionicons name="radio-outline" size={20} color={colors.primary} />
         <Text style={[styles.infoText, { color: colors.secondaryForeground }]}>
-          Airbuddies werkt volledig zonder internet. Berichten gaan via Bluetooth van telefoon naar telefoon.
+          Airbuddies werkt volledig zonder internet. Berichten gaan via Bluetooth van telefoon naar telefoon — ook in het vliegtuig.
         </Text>
       </View>
     </ScrollView>
@@ -221,35 +226,34 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
+  header: { paddingHorizontal: 20, paddingBottom: 16 },
   title: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
   profileCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 14,
     marginHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
   },
   profileInfo: { flex: 1, gap: 4 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  profileName: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  profileFp: { fontSize: 12, fontFamily: "Inter_400Regular", letterSpacing: 0.5 },
-  editRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  nameInput: {
-    flex: 1,
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
+  profileName: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  profileBio: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  interestRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
+  moreInterests: { fontSize: 12, fontFamily: "Inter_400Regular", alignSelf: "center" },
+  seatBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
   },
+  seatText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   sectionLabel: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
@@ -276,9 +280,11 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   settingLabel: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
-  settingRight: { flexDirection: "row", alignItems: "center", gap: 4 },
+  settingRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   settingValue: { fontSize: 13, fontFamily: "Inter_400Regular" },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 62 },
+  visHint: { paddingHorizontal: 14, paddingBottom: 12, paddingTop: 4 },
+  visHintText: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
   infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",

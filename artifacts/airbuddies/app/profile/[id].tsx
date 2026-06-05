@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/Avatar";
+import { InterestChip } from "@/components/InterestChip";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -31,7 +32,7 @@ export default function ProfileScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={{ paddingTop: topPad + 8, paddingHorizontal: 16 }}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={26} color={colors.primary} />
           </Pressable>
         </View>
@@ -45,20 +46,16 @@ export default function ProfileScreen() {
   }
 
   const statusColor =
-    buddy.status === "online"
-      ? colors.online
-      : buddy.status === "nearby"
-      ? colors.nearby
-      : colors.mutedForeground;
+    buddy.status === "online" ? colors.online
+    : buddy.status === "nearby" ? colors.nearby
+    : colors.mutedForeground;
 
   const statusLabel =
-    buddy.status === "online"
-      ? "Online"
-      : buddy.status === "nearby"
-      ? "In de buurt"
-      : buddy.lastSeen
-      ? `Gezien ${new Date(buddy.lastSeen).toLocaleDateString("nl-NL")}`
-      : "Offline";
+    buddy.status === "online" ? "Online"
+    : buddy.status === "nearby" ? "In de buurt"
+    : buddy.lastSeen
+    ? `Gezien ${new Date(buddy.lastSeen).toLocaleDateString("nl-NL")}`
+    : "Offline";
 
   const handleMessage = () => {
     const conv = startConversation(buddy.id);
@@ -71,10 +68,7 @@ export default function ProfileScreen() {
       {
         text: "Verwijder",
         style: "destructive",
-        onPress: () => {
-          removeBuddy(buddy.id);
-          router.back();
-        },
+        onPress: () => { removeBuddy(buddy.id); router.back(); },
       },
     ]);
   };
@@ -82,16 +76,16 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={[isWeb ? { paddingBottom: 34 } : undefined]}
+      contentContainerStyle={[styles.scroll, isWeb ? { paddingBottom: 34 } : undefined]}
       showsVerticalScrollIndicator={false}
     >
       <View
         style={[
-          styles.profileHeader,
+          styles.topBar,
           { paddingTop: topPad + 8, backgroundColor: colors.card, borderBottomColor: colors.border },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={26} color={colors.primary} />
         </Pressable>
         <Pressable
@@ -108,9 +102,29 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Avatar name={buddy.name} size={88} showOnlineIndicator isOnline={buddy.status === "online"} isNearby={buddy.status === "nearby"} />
         <Text style={[styles.name, { color: colors.foreground }]}>{buddy.name}</Text>
+
+        <View style={styles.metaRow}>
+          {buddy.gender && (
+            <View style={[styles.metaPill, { backgroundColor: colors.muted }]}>
+              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{buddy.gender}</Text>
+            </View>
+          )}
+          {buddy.age && (
+            <View style={[styles.metaPill, { backgroundColor: colors.muted }]}>
+              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{buddy.age} jaar</Text>
+            </View>
+          )}
+          {buddy.seatNumber && (
+            <View style={[styles.metaPill, { backgroundColor: colors.primary + "18" }]}>
+              <Ionicons name="airplane-outline" size={12} color={colors.primary} />
+              <Text style={[styles.metaText, { color: colors.primary }]}>Stoel {buddy.seatNumber}</Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.statusRow}>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
           <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
@@ -124,21 +138,23 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Fingerprint</Text>
-          <Text style={[styles.infoValue, { color: colors.foreground }]} numberOfLines={2}>
-            {buddy.fingerprint}
-          </Text>
+      {buddy.bio && (
+        <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.bioTitle, { color: colors.mutedForeground }]}>Over</Text>
+          <Text style={[styles.bioText, { color: colors.foreground }]}>{buddy.bio}</Text>
         </View>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Verificatie</Text>
-          <Text style={[styles.infoValue, { color: buddy.isVerified ? colors.success : colors.nearby }]}>
-            {buddy.isVerified ? "Geverifieerd" : "Niet geverifieerd"}
-          </Text>
+      )}
+
+      {(buddy.interests?.length ?? 0) > 0 && (
+        <View style={[styles.interestsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.bioTitle, { color: colors.mutedForeground }]}>Interesses</Text>
+          <View style={styles.chipGrid}>
+            {buddy.interests!.map((i) => (
+              <InterestChip key={i} label={i} selected />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.actions}>
         <Pressable
@@ -148,6 +164,14 @@ export default function ProfileScreen() {
           <Ionicons name="chatbubble" size={20} color={colors.primaryForeground} />
           <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Stuur bericht</Text>
         </Pressable>
+      </View>
+
+      <View style={[styles.fpCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.fpRow}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+          <Text style={[styles.fpLabel, { color: colors.mutedForeground }]}>Fingerprint</Text>
+        </View>
+        <Text style={[styles.fpValue, { color: colors.foreground }]}>{buddy.fingerprint}</Text>
       </View>
 
       <Pressable
@@ -162,7 +186,8 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  profileHeader: {
+  scroll: { flexGrow: 1 },
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -170,8 +195,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { padding: 4 },
-  profileCard: {
+  heroCard: {
     alignItems: "center",
     padding: 28,
     margin: 16,
@@ -180,6 +204,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   name: { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
+  metaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  metaText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 14, fontFamily: "Inter_500Medium" },
@@ -190,20 +224,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    marginTop: 4,
   },
   verifiedText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  section: {
+  bioCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    gap: 6,
+  },
+  bioTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  bioText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+  interestsCard: {
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 14,
     borderWidth: 1,
-    overflow: "hidden",
+    padding: 16,
+    gap: 10,
   },
-  infoRow: { padding: 14, gap: 4 },
-  infoLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  infoValue: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
+  chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   actions: { paddingHorizontal: 16, marginBottom: 12 },
   actionBtn: {
     flexDirection: "row",
@@ -214,6 +255,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  fpCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 6,
+  },
+  fpRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  fpLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  fpValue: { fontSize: 12, fontFamily: "Inter_500Medium", letterSpacing: 0.5 },
   dangerBtn: {
     marginHorizontal: 16,
     marginBottom: 20,
