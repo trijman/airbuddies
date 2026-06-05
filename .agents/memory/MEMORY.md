@@ -1,0 +1,2 @@
+- [Airbuddies onboarding routing](airbuddies-onboarding.md) — onboarding check lives in AppContext; redirect in RootLayoutNav via useEffect; key is `onboarding_done_v1`
+- [Airbuddies api-zod conflict](airbuddies-api-zod.md) — after codegen, api-zod/src/index.ts must only export `./generated/api`, NOT `./generated/types` (duplicate name clash)

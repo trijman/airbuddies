@@ -102,6 +102,7 @@ interface AppContextType {
   messages: Record<string, Message[]>;
   nearbyDevices: NearbyDevice[];
   isScanning: boolean;
+  onboardingComplete: boolean | null;
   sendMessage: (conversationId: string, content: string) => void;
   sendContactCard: (conversationId: string) => void;
   addBuddy: (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked">) => void;
@@ -122,6 +123,7 @@ interface AppContextType {
   markAsRead: (conversationId: string) => void;
   clearChatHistory: (conversationId: string) => void;
   leaveGroup: (conversationId: string) => void;
+  completeOnboarding: (data: Partial<UserProfile>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -201,6 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [nearbyDevices, setNearbyDevices] = useState<NearbyDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -209,7 +212,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadData = async () => {
     try {
-      const storedProfile = await AsyncStorage.getItem("profile_v2");
+      const [storedProfile, onboardingDone] = await Promise.all([
+        AsyncStorage.getItem("profile_v2"),
+        AsyncStorage.getItem("onboarding_done_v1"),
+      ]);
+
+      setOnboardingComplete(onboardingDone === "1");
+
       if (storedProfile) {
         setProfile(JSON.parse(storedProfile));
       } else {
@@ -240,6 +249,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem("messages_v2", JSON.stringify(demo.messages));
       }
     } catch (e) {
+      setOnboardingComplete(false);
       const demo = buildDemoData();
       setConversations(demo.conversations);
       setMessages(demo.messages);
@@ -608,6 +618,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const completeOnboarding = useCallback(async (data: Partial<UserProfile>) => {
+    const completed: UserProfile = {
+      id: MY_ID,
+      publicKey: "pk_me_001",
+      fingerprint: MY_FINGERPRINT,
+      isVisible: true,
+      interests: [],
+      name: "Reiziger",
+      avatarSeed: data.name ?? "me",
+      ...data,
+    };
+    setProfile(completed);
+    await AsyncStorage.setItem("profile_v2", JSON.stringify(completed));
+    await AsyncStorage.setItem("onboarding_done_v1", "1");
+    setOnboardingComplete(true);
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -617,6 +644,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         messages,
         nearbyDevices,
         isScanning,
+        onboardingComplete,
         sendMessage,
         sendContactCard,
         addBuddy,
@@ -633,6 +661,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         markAsRead,
         clearChatHistory,
         leaveGroup,
+        completeOnboarding,
       }}
     >
       {children}

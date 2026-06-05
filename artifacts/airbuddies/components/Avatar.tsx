@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
-const AVATAR_COLORS = [
+const AVATAR_COLORS: [string, string][] = [
   ["#0ea5e9", "#0369a1"],
   ["#8b5cf6", "#6d28d9"],
   ["#ec4899", "#be185d"],
