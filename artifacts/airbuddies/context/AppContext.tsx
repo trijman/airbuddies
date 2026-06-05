@@ -28,6 +28,8 @@ export interface Message {
   contactData?: ContactData;
 }
 
+export type BuddyRelation = "buddy" | "pending_sent" | "pending_received" | "none";
+
 export interface Buddy {
   id: string;
   name: string;
@@ -36,6 +38,7 @@ export interface Buddy {
   isVerified: boolean;
   isFavorite: boolean;
   isBlocked: boolean;
+  relation: BuddyRelation;
   lastSeen?: number;
   status: "online" | "offline" | "nearby";
   age?: number;
@@ -105,9 +108,12 @@ interface AppContextType {
   onboardingComplete: boolean | null;
   sendMessage: (conversationId: string, content: string) => void;
   sendContactCard: (conversationId: string) => void;
-  addBuddy: (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked">) => void;
+  addBuddy: (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked" | "relation">) => void;
   removeBuddy: (buddyId: string) => void;
   toggleFavorite: (buddyId: string) => void;
+  sendBuddyRequest: (device: NearbyDevice) => void;
+  acceptBuddyRequest: (buddyId: string) => void;
+  declineBuddyRequest: (buddyId: string) => void;
   createGroup: (
     name: string,
     memberIds: string[],
@@ -154,6 +160,7 @@ const DEMO_BUDDIES: Buddy[] = [
     isVerified: true,
     isFavorite: true,
     isBlocked: false,
+    relation: "buddy",
     lastSeen: Date.now() - 1000 * 60 * 2,
     status: "online",
     age: 28,
@@ -170,6 +177,7 @@ const DEMO_BUDDIES: Buddy[] = [
     isVerified: false,
     isFavorite: false,
     isBlocked: false,
+    relation: "buddy",
     lastSeen: Date.now() - 1000 * 60 * 45,
     status: "nearby",
     age: 34,
@@ -186,6 +194,7 @@ const DEMO_BUDDIES: Buddy[] = [
     isVerified: true,
     isFavorite: false,
     isBlocked: false,
+    relation: "buddy",
     lastSeen: Date.now() - 1000 * 60 * 60 * 3,
     status: "offline",
     age: 25,
@@ -193,6 +202,40 @@ const DEMO_BUDDIES: Buddy[] = [
     bio: "Duiker en yogadocent. Dol op avontuur.",
     interests: ["Duiken", "Yoga", "Natuur", "Reizen"],
     seatNumber: "7F",
+  },
+  {
+    id: "req_1",
+    name: "Lucas",
+    publicKey: "pk_lucas_001",
+    fingerprint: generateFingerprint(),
+    isVerified: false,
+    isFavorite: false,
+    isBlocked: false,
+    relation: "pending_received",
+    lastSeen: Date.now() - 1000 * 60 * 5,
+    status: "nearby",
+    age: 29,
+    gender: "Man",
+    bio: "Muzikant op tournee. Altijd in voor een goed gesprek.",
+    interests: ["Muziek", "Reizen", "Film & TV"],
+    seatNumber: "18B",
+  },
+  {
+    id: "req_2",
+    name: "Yasmin",
+    publicKey: "pk_yasmin_001",
+    fingerprint: generateFingerprint(),
+    isVerified: false,
+    isFavorite: false,
+    isBlocked: false,
+    relation: "pending_received",
+    lastSeen: Date.now() - 1000 * 60 * 12,
+    status: "nearby",
+    age: 31,
+    gender: "Vrouw",
+    bio: "Foodblogger en wijnliefhebber.",
+    interests: ["Eten & Drinken", "Wijn", "Koken", "Reizen"],
+    seatNumber: "9C",
   },
 ];
 
@@ -423,8 +466,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addBuddy = useCallback(
-    (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked">) => {
-      const newBuddy: Buddy = { ...buddy, isVerified: false, isFavorite: false, isBlocked: false };
+    (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked" | "relation">) => {
+      const newBuddy: Buddy = { ...buddy, isVerified: false, isFavorite: false, isBlocked: false, relation: "buddy" };
       setBuddies((prev) => {
         if (prev.find((b) => b.id === buddy.id)) return prev;
         return [...prev, newBuddy];
@@ -441,6 +484,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBuddies((prev) =>
       prev.map((b) => (b.id === buddyId ? { ...b, isFavorite: !b.isFavorite } : b))
     );
+  }, []);
+
+  const sendBuddyRequest = useCallback((device: NearbyDevice) => {
+    const newBuddy: Buddy = {
+      id: device.id,
+      name: device.name,
+      publicKey: "pk_" + device.id,
+      fingerprint: device.fingerprint,
+      isVerified: false,
+      isFavorite: false,
+      isBlocked: false,
+      relation: "pending_sent",
+      lastSeen: Date.now(),
+      status: "nearby",
+      interests: device.interests,
+      seatNumber: device.seatNumber,
+      age: device.age,
+      gender: device.gender,
+    };
+    setBuddies((prev) => {
+      if (prev.find((b) => b.id === device.id)) return prev;
+      return [...prev, newBuddy];
+    });
+    setNearbyDevices((prev) => prev.filter((d) => d.id !== device.id));
+  }, []);
+
+  const acceptBuddyRequest = useCallback((buddyId: string) => {
+    setBuddies((prev) =>
+      prev.map((b) => (b.id === buddyId ? { ...b, relation: "buddy" as BuddyRelation } : b))
+    );
+  }, []);
+
+  const declineBuddyRequest = useCallback((buddyId: string) => {
+    setBuddies((prev) => prev.filter((b) => b.id !== buddyId));
   }, []);
 
   const createGroup = useCallback(
@@ -650,6 +727,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addBuddy,
         removeBuddy,
         toggleFavorite,
+        sendBuddyRequest,
+        acceptBuddyRequest,
+        declineBuddyRequest,
         createGroup,
         startScan,
         stopScan,

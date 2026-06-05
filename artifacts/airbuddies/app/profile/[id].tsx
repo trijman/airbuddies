@@ -22,7 +22,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { buddies, removeBuddy, toggleFavorite, startConversation } = useApp();
+  const { buddies, profile, removeBuddy, toggleFavorite, startConversation, acceptBuddyRequest, declineBuddyRequest } = useApp();
   const isWeb = Platform.OS === "web";
 
   const buddy = buddies.find((b) => b.id === id);
@@ -44,6 +44,10 @@ export default function ProfileScreen() {
       </View>
     );
   }
+
+  const myInterests = profile?.interests ?? [];
+  const sharedInterests = myInterests.filter((i) => buddy.interests?.includes(i));
+  const otherInterests = buddy.interests?.filter((i) => !myInterests.includes(i)) ?? [];
 
   const statusColor =
     buddy.status === "online" ? colors.online
@@ -73,6 +77,23 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleAccept = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    acceptBuddyRequest(buddy.id);
+  };
+
+  const handleDecline = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert("Verzoek weigeren", `Wil je het verzoek van ${buddy.name} weigeren?`, [
+      { text: "Annuleer", style: "cancel" },
+      {
+        text: "Weiger",
+        style: "destructive",
+        onPress: () => { declineBuddyRequest(buddy.id); router.back(); },
+      },
+    ]);
+  };
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -88,22 +109,31 @@ export default function ProfileScreen() {
         <Pressable onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={26} color={colors.primary} />
         </Pressable>
-        <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            toggleFavorite(buddy.id);
-          }}
-        >
-          <Ionicons
-            name={buddy.isFavorite ? "star" : "star-outline"}
-            size={24}
-            color={buddy.isFavorite ? colors.nearby : colors.mutedForeground}
-          />
-        </Pressable>
+
+        {buddy.relation === "buddy" && (
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggleFavorite(buddy.id);
+            }}
+          >
+            <Ionicons
+              name={buddy.isFavorite ? "star" : "star-outline"}
+              size={24}
+              color={buddy.isFavorite ? "#f59e0b" : colors.mutedForeground}
+            />
+          </Pressable>
+        )}
       </View>
 
       <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Avatar name={buddy.name} size={88} showOnlineIndicator isOnline={buddy.status === "online"} isNearby={buddy.status === "nearby"} />
+        <Avatar
+          name={buddy.name}
+          size={88}
+          showOnlineIndicator
+          isOnline={buddy.status === "online"}
+          isNearby={buddy.status === "nearby"}
+        />
         <Text style={[styles.name, { color: colors.foreground }]}>{buddy.name}</Text>
 
         <View style={styles.metaRow}>
@@ -136,6 +166,15 @@ export default function ProfileScreen() {
             <Text style={[styles.verifiedText, { color: colors.primary }]}>Geverifieerd</Text>
           </View>
         )}
+
+        {buddy.relation === "pending_sent" && (
+          <View style={[styles.relationBadge, { backgroundColor: colors.muted }]}>
+            <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.relationText, { color: colors.mutedForeground }]}>
+              Verzoek verzonden
+            </Text>
+          </View>
+        )}
       </View>
 
       {buddy.bio && (
@@ -145,7 +184,35 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {(buddy.interests?.length ?? 0) > 0 && (
+      {sharedInterests.length > 0 && (
+        <View style={[styles.interestsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.interestsTitleRow}>
+            <Ionicons name="sparkles" size={14} color={colors.primary} />
+            <Text style={[styles.bioTitle, { color: colors.primary }]}>
+              {sharedInterests.length} Gedeelde interesse{sharedInterests.length > 1 ? "s" : ""}
+            </Text>
+          </View>
+          <View style={styles.chipGrid}>
+            {sharedInterests.map((i) => (
+              <InterestChip key={i} label={i} selected />
+            ))}
+          </View>
+          {otherInterests.length > 0 && (
+            <>
+              <Text style={[styles.bioTitle, { color: colors.mutedForeground, marginTop: 10 }]}>
+                Overige interesses
+              </Text>
+              <View style={styles.chipGrid}>
+                {otherInterests.map((i) => (
+                  <InterestChip key={i} label={i} />
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      )}
+
+      {sharedInterests.length === 0 && (buddy.interests?.length ?? 0) > 0 && (
         <View style={[styles.interestsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.bioTitle, { color: colors.mutedForeground }]}>Interesses</Text>
           <View style={styles.chipGrid}>
@@ -157,13 +224,42 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.actions}>
-        <Pressable
-          style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-          onPress={handleMessage}
-        >
-          <Ionicons name="chatbubble" size={20} color={colors.primaryForeground} />
-          <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Stuur bericht</Text>
-        </Pressable>
+        {buddy.relation === "buddy" && (
+          <Pressable
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+            onPress={handleMessage}
+          >
+            <Ionicons name="chatbubble" size={20} color={colors.primaryForeground} />
+            <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Stuur bericht</Text>
+          </Pressable>
+        )}
+
+        {buddy.relation === "pending_received" && (
+          <View style={styles.requestRow}>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]}
+              onPress={handleAccept}
+            >
+              <Ionicons name="checkmark" size={20} color={colors.primaryForeground} />
+              <Text style={[styles.actionText, { color: colors.primaryForeground }]}>Accepteer buddy</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.declineBtn, { borderColor: colors.border }]}
+              onPress={handleDecline}
+            >
+              <Text style={[styles.declineText, { color: colors.destructive }]}>Weiger</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {buddy.relation === "pending_sent" && (
+          <View style={[styles.pendingBanner, { backgroundColor: colors.muted }]}>
+            <Ionicons name="time-outline" size={18} color={colors.mutedForeground} />
+            <Text style={[styles.pendingText, { color: colors.mutedForeground }]}>
+              Wachten op reactie van {buddy.name}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={[styles.fpCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -174,12 +270,14 @@ export default function ProfileScreen() {
         <Text style={[styles.fpValue, { color: colors.foreground }]}>{buddy.fingerprint}</Text>
       </View>
 
-      <Pressable
-        style={[styles.dangerBtn, { borderColor: colors.border }]}
-        onPress={handleRemove}
-      >
-        <Text style={[styles.dangerText, { color: colors.destructive }]}>Verwijder buddy</Text>
-      </Pressable>
+      {buddy.relation === "buddy" && (
+        <Pressable
+          style={[styles.dangerBtn, { borderColor: colors.border }]}
+          onPress={handleRemove}
+        >
+          <Text style={[styles.dangerText, { color: colors.destructive }]}>Verwijder buddy</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -226,6 +324,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   verifiedText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  relationBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  relationText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   bioCard: {
     marginHorizontal: 16,
     marginBottom: 12,
@@ -244,8 +351,9 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
   },
+  interestsTitleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  actions: { paddingHorizontal: 16, marginBottom: 12 },
+  actions: { paddingHorizontal: 16, marginBottom: 12, gap: 10 },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -255,6 +363,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionText: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  requestRow: { flexDirection: "row", gap: 10 },
+  declineBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  declineText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  pendingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+  },
+  pendingText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1 },
   fpCard: {
     marginHorizontal: 16,
     marginBottom: 12,

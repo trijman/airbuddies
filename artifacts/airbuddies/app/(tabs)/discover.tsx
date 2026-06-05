@@ -48,14 +48,15 @@ function getSharedInterests(myInterests: string[], deviceInterests?: string[]): 
 
 function DeviceCard({ device, index, myInterests }: { device: NearbyDevice; index: number; myInterests: string[] }) {
   const colors = useColors();
-  const { acceptNearbyDevice, buddies } = useApp();
-  const alreadyAdded = buddies.some((b) => b.id === device.id);
+  const { sendBuddyRequest, buddies } = useApp();
+  const existingRelation = buddies.find((b) => b.id === device.id)?.relation;
+  const alreadyAdded = !!existingRelation;
   const shared = useMemo(() => getSharedInterests(myInterests, device.interests), [myInterests, device.interests]);
 
   const handleAdd = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    acceptNearbyDevice(device);
-    Alert.alert("Buddy toegevoegd!", `${device.name} is nu een buddy.`);
+    sendBuddyRequest(device);
+    Alert.alert("Verzoek verzonden!", `${device.name} krijgt een buddy-verzoek.`);
   };
 
   return (
