@@ -158,6 +158,19 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Vlucht</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <SettingRow
+          icon="airplane-outline"
+          iconColor={colors.primary}
+          label="Mijn Vluchten"
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/my-flights");
+          }}
+        />
+      </View>
+
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Privacy & Veiligheid</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow

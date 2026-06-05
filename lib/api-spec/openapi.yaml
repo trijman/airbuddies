@@ -10,13 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: flights
+    description: Pre-flight registration
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +25,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /flights/register:
+    post:
+      operationId: registerFlight
+      tags: [flights]
+      summary: Register for an upcoming flight
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterFlightRequest"
+      responses:
+        "201":
+          description: Registration created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightRegistrationResponse"
+        "400":
+          description: Bad request
+
+  /flights/unregister:
+    delete:
+      operationId: unregisterFlight
+      tags: [flights]
+      summary: Cancel a flight registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnregisterFlightRequest"
+      responses:
+        "200":
+          description: Successfully unregistered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnregisterFlightResponse"
+
+  /flights/{flightNumber}/passengers:
+    get:
+      operationId: getFlightPassengers
+      tags: [flights]
+      summary: Get passenger count for a flight on a date
+      parameters:
+        - name: flightNumber
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Passenger information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightPassengers"
+        "400":
+          description: Bad request
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +102,82 @@ components:
       required:
         - status
 
+    RegisterFlightRequest:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+        passengerName:
+          type: string
+      required:
+        - deviceId
+        - flightNumber
+        - flightDate
+
+    FlightRegistrationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        deviceId:
+          type: string
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+        passengerName:
+          type: string
+          nullable: true
+        registeredAt:
+          type: string
+      required:
+        - id
+        - deviceId
+        - flightNumber
+        - flightDate
+        - registeredAt
+
+    UnregisterFlightRequest:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+      required:
+        - deviceId
+        - flightNumber
+        - flightDate
+
+    UnregisterFlightResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    FlightPassengers:
+      type: object
+      properties:
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+        count:
+          type: integer
+        names:
+          type: array
+          items:
+            type: string
+      required:
+        - flightNumber
+        - flightDate
+        - count
+        - names
