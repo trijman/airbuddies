@@ -18,9 +18,6 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInRight,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
 } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
@@ -49,15 +46,6 @@ export default function OnboardingScreen() {
 
   const nameInputRef = useRef<TextInput>(null);
   const seatInputRef = useRef<TextInput>(null);
-
-  const progress = useSharedValue(0);
-
-  const progressStyle = useAnimatedStyle(() => ({
-    width: withSpring(`${(step / TOTAL_STEPS) * 100}%` as unknown as number, {
-      damping: 20,
-      stiffness: 120,
-    }),
-  }));
 
   const goNext = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
