@@ -91,7 +91,7 @@ function ContactCardBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   );
 }
 
-function MessageBubble({ msg, isMe, senderName }: { msg: Message; isMe: boolean; senderName?: string }) {
+function MessageBubble({ msg, isMe, senderName, senderSeat }: { msg: Message; isMe: boolean; senderName?: string; senderSeat?: string }) {
   const colors = useColors();
 
   if (msg.type === "contact-card") {
@@ -124,7 +124,15 @@ function MessageBubble({ msg, isMe, senderName }: { msg: Message; isMe: boolean;
         ]}
       >
         {senderName && !isMe && (
-          <Text style={[styles.senderLabel, { color: colors.primary }]}>{senderName}</Text>
+          <View style={styles.senderRow}>
+            <Text style={[styles.senderLabel, { color: colors.primary }]}>{senderName}</Text>
+            {senderSeat && (
+              <View style={styles.senderSeatTag}>
+                <Ionicons name="airplane-outline" size={9} color={colors.primary + "99"} />
+                <Text style={[styles.senderSeat, { color: colors.primary + "99" }]}>{senderSeat}</Text>
+              </View>
+            )}
+          </View>
         )}
         <Text
           style={[
@@ -191,6 +199,14 @@ export default function ChatScreen() {
       return b?.name ?? "Passagier";
     },
     [buddies, profile]
+  );
+
+  const getSenderSeat = useCallback(
+    (senderId: string) => {
+      const b = buddies.find((b) => b.id === senderId);
+      return b?.seatNumber;
+    },
+    [buddies]
   );
 
   const isGroup = conv?.type === "group";
@@ -332,7 +348,8 @@ export default function ChatScreen() {
         renderItem={({ item }) => {
           const isMe = item.senderId === profile?.id;
           const senderName = isGroup && !isMe ? getSenderName(item.senderId) : undefined;
-          return <MessageBubble msg={item} isMe={isMe} senderName={senderName} />;
+          const senderSeat = isGroup && !isMe ? getSenderSeat(item.senderId) : undefined;
+          return <MessageBubble msg={item} isMe={isMe} senderName={senderName} senderSeat={senderSeat} />;
         }}
         contentContainerStyle={styles.msgList}
         keyboardDismissMode="interactive"
@@ -461,7 +478,10 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     gap: 2,
   },
-  senderLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginBottom: 1 },
+  senderRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 1 },
+  senderLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  senderSeatTag: { flexDirection: "row", alignItems: "center", gap: 2 },
+  senderSeat: { fontSize: 10, fontFamily: "Inter_500Medium" },
   bubbleText: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end" },
   bubbleTime: { fontSize: 11 },

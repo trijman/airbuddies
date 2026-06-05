@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -16,7 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
-import { useApp } from "@/context/AppContext";
+import { InterestChip } from "@/components/InterestChip";
+import { useApp, INTERESTS } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import type { Buddy } from "@/context/AppContext";
 
@@ -29,24 +30,26 @@ function formatLastSeen(ts?: number): string {
   return `${Math.floor(diff / 86400_000)} dag geleden`;
 }
 
-function BuddyRow({ buddy, index }: { buddy: Buddy; index: number }) {
+function getSharedInterests(myInterests: string[], buddyInterests?: string[]): string[] {
+  if (!buddyInterests?.length || !myInterests.length) return [];
+  return myInterests.filter((i) => buddyInterests.includes(i));
+}
+
+function BuddyCard({ buddy, index, myInterests }: { buddy: Buddy; index: number; myInterests: string[] }) {
   const colors = useColors();
   const { toggleFavorite, removeBuddy, startConversation } = useApp();
-  const isWeb = Platform.OS === "web";
 
-  const statusLabel =
-    buddy.status === "online"
-      ? "Online"
-      : buddy.status === "nearby"
-      ? "In de buurt"
-      : formatLastSeen(buddy.lastSeen);
+  const shared = useMemo(() => getSharedInterests(myInterests, buddy.interests), [myInterests, buddy.interests]);
 
   const statusColor =
-    buddy.status === "online"
-      ? colors.online
-      : buddy.status === "nearby"
-      ? colors.nearby
-      : colors.mutedForeground;
+    buddy.status === "online" ? colors.online
+    : buddy.status === "nearby" ? colors.nearby
+    : colors.mutedForeground;
+
+  const statusLabel =
+    buddy.status === "online" ? "Online"
+    : buddy.status === "nearby" ? "In de buurt"
+    : formatLastSeen(buddy.lastSeen);
 
   const handleMessage = () => {
     const conv = startConversation(buddy.id);
@@ -55,7 +58,7 @@ function BuddyRow({ buddy, index }: { buddy: Buddy; index: number }) {
 
   const handleHold = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(buddy.name, "Wat wil je doen?", [
+    Alert.alert(buddy.name, undefined, [
       {
         text: buddy.isFavorite ? "Verwijder uit favorieten" : "Toevoegen aan favorieten",
         onPress: () => toggleFavorite(buddy.id),
@@ -65,59 +68,113 @@ function BuddyRow({ buddy, index }: { buddy: Buddy; index: number }) {
         text: "Verwijder buddy",
         style: "destructive",
         onPress: () =>
-          Alert.alert(
-            "Verwijder buddy",
-            `Wil je ${buddy.name} verwijderen?`,
-            [
-              { text: "Annuleer", style: "cancel" },
-              { text: "Verwijder", style: "destructive", onPress: () => removeBuddy(buddy.id) },
-            ]
-          ),
+          Alert.alert("Verwijder buddy", `Wil je ${buddy.name} verwijderen?`, [
+            { text: "Annuleer", style: "cancel" },
+            { text: "Verwijder", style: "destructive", onPress: () => removeBuddy(buddy.id) },
+          ]),
       },
       { text: "Annuleer", style: "cancel" },
     ]);
   };
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 50).springify()}>
+    <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
       <Pressable
         style={({ pressed }) => [
-          styles.buddyRow,
-          { backgroundColor: pressed ? colors.muted : colors.card },
+          styles.card,
+          { backgroundColor: pressed ? colors.muted : colors.card, borderColor: colors.border },
         ]}
-        onPress={handleMessage}
+        onPress={() => router.push(`/profile/${buddy.id}`)}
         onLongPress={handleHold}
         testID={`buddy-row-${buddy.id}`}
       >
-        <Avatar
-          name={buddy.name}
-          size={50}
-          showOnlineIndicator
-          isOnline={buddy.status === "online"}
-          isNearby={buddy.status === "nearby"}
-        />
-        <View style={styles.buddyInfo}>
-          <View style={styles.buddyNameRow}>
-            <Text style={[styles.buddyName, { color: colors.foreground }]}>
-              {buddy.name}
-            </Text>
-            {buddy.isVerified && (
-              <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+        <View style={styles.cardTop}>
+          <Avatar
+            name={buddy.name}
+            size={52}
+            showOnlineIndicator
+            isOnline={buddy.status === "online"}
+            isNearby={buddy.status === "nearby"}
+          />
+          <View style={styles.cardInfo}>
+            <View style={styles.nameRow}>
+              <Text style={[styles.buddyName, { color: colors.foreground }]} numberOfLines={1}>
+                {buddy.name}
+              </Text>
+              {buddy.isVerified && (
+                <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
+              )}
+              {buddy.isFavorite && (
+                <Ionicons name="star" size={13} color="#f59e0b" />
+              )}
+            </View>
+
+            <View style={styles.metaRow}>
+              {buddy.gender && (
+                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{buddy.gender}</Text>
+              )}
+              {buddy.age && (
+                <Text style={[styles.metaText, { color: colors.mutedForeground }]}>• {buddy.age} jr</Text>
+              )}
+              {buddy.seatNumber && (
+                <View style={styles.seatTag}>
+                  <Ionicons name="airplane-outline" size={10} color={colors.primary} />
+                  <Text style={[styles.seatText, { color: colors.primary }]}>{buddy.seatNumber}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.statusRow}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
+            </View>
+          </View>
+
+          <View style={styles.cardActions}>
+            {shared.length > 0 && (
+              <View style={[styles.matchBadge, { backgroundColor: colors.primary + "18" }]}>
+                <Text style={[styles.matchCount, { color: colors.primary }]}>{shared.length}</Text>
+                <Ionicons name="heart" size={10} color={colors.primary} />
+              </View>
             )}
-            {buddy.isFavorite && (
-              <Ionicons name="star" size={13} color={colors.nearby} />
+            <Pressable
+              style={[styles.msgBtn, { backgroundColor: colors.secondary }]}
+              onPress={handleMessage}
+              testID={`msg-btn-${buddy.id}`}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
+            </Pressable>
+          </View>
+        </View>
+
+        {buddy.bio && (
+          <Text style={[styles.bio, { color: colors.mutedForeground }]} numberOfLines={2}>
+            {buddy.bio}
+          </Text>
+        )}
+
+        {shared.length > 0 && (
+          <View style={styles.sharedRow}>
+            <Ionicons name="sparkles" size={12} color={colors.primary} />
+            <Text style={[styles.sharedLabel, { color: colors.primary }]}>
+              Gedeelde interesses:
+            </Text>
+            {shared.slice(0, 3).map((i) => (
+              <InterestChip key={i} label={i} selected small />
+            ))}
+            {shared.length > 3 && (
+              <Text style={[styles.moreText, { color: colors.mutedForeground }]}>+{shared.length - 3}</Text>
             )}
           </View>
-          <Text style={[styles.buddyStatus, { color: statusColor }]} numberOfLines={1}>
-            {statusLabel}
-          </Text>
-        </View>
-        <Pressable
-          style={[styles.msgBtn, { backgroundColor: colors.secondary }]}
-          onPress={handleMessage}
-        >
-          <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
-        </Pressable>
+        )}
+
+        {!buddy.bio && !shared.length && (buddy.interests?.length ?? 0) > 0 && (
+          <View style={styles.sharedRow}>
+            {buddy.interests!.slice(0, 3).map((i) => (
+              <InterestChip key={i} label={i} small />
+            ))}
+          </View>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -126,42 +183,52 @@ function BuddyRow({ buddy, index }: { buddy: Buddy; index: number }) {
 export default function BuddiesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buddies } = useApp();
+  const { buddies, profile } = useApp();
   const [search, setSearch] = useState("");
   const isWeb = Platform.OS === "web";
-
   const topPad = isWeb ? 67 : insets.top;
 
-  const favorites = buddies.filter(
-    (b) => b.isFavorite && b.name.toLowerCase().includes(search.toLowerCase())
+  const myInterests = profile?.interests ?? [];
+
+  const filtered = useMemo(
+    () => buddies.filter((b) => b.name.toLowerCase().includes(search.toLowerCase())),
+    [buddies, search]
   );
-  const others = buddies.filter(
-    (b) => !b.isFavorite && b.name.toLowerCase().includes(search.toLowerCase())
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const aShared = getSharedInterests(myInterests, a.interests).length;
+      const bShared = getSharedInterests(myInterests, b.interests).length;
+      if (b.isFavorite !== a.isFavorite) return a.isFavorite ? -1 : 1;
+      if (bShared !== aShared) return bShared - aShared;
+      const order = { online: 0, nearby: 1, offline: 2 };
+      return order[a.status] - order[b.status];
+    });
+  }, [filtered, myInterests]);
+
+  const totalMatches = useMemo(
+    () => buddies.filter((b) => getSharedInterests(myInterests, b.interests).length > 0).length,
+    [buddies, myInterests]
   );
-  const sections = [
-    ...(favorites.length > 0
-      ? [{ type: "header" as const, label: "Favorieten" }, ...favorites.map((b) => ({ type: "buddy" as const, buddy: b }))]
-      : []),
-    ...(others.length > 0
-      ? [{ type: "header" as const, label: "Alle buddies" }, ...others.map((b) => ({ type: "buddy" as const, buddy: b }))]
-      : []),
-  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View
         style={[
           styles.header,
-          {
-            paddingTop: topPad + 8,
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-          },
+          { paddingTop: topPad + 8, backgroundColor: colors.background, borderBottomColor: colors.border },
         ]}
       >
-        <Text style={[styles.title, { color: colors.foreground }]}>Buddies</Text>
+        <View>
+          <Text style={[styles.title, { color: colors.foreground }]}>Buddies</Text>
+          {totalMatches > 0 && myInterests.length > 0 && (
+            <Text style={[styles.matchHint, { color: colors.primary }]}>
+              {totalMatches} interesse-match{totalMatches > 1 ? "es" : ""}
+            </Text>
+          )}
+        </View>
         <Pressable
-          onPress={() => router.push("/discover")}
+          onPress={() => router.push("/(tabs)/discover")}
           style={[styles.addBtn, { backgroundColor: colors.primary }]}
           testID="discover-button"
         >
@@ -182,22 +249,28 @@ export default function BuddiesScreen() {
         </View>
       </View>
 
+      {myInterests.length === 0 && buddies.length > 0 && (
+        <Pressable
+          style={[styles.noInterestsBanner, { backgroundColor: colors.secondary, borderColor: colors.primary + "33" }]}
+          onPress={() => router.push("/edit-profile")}
+        >
+          <Ionicons name="sparkles-outline" size={18} color={colors.primary} />
+          <Text style={[styles.noInterestsText, { color: colors.primary }]}>
+            Voeg interesses toe voor matches
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        </Pressable>
+      )}
+
       <FlatList
-        data={sections}
-        keyExtractor={(_, i) => i.toString()}
-        renderItem={({ item, index }) => {
-          if (item.type === "header") {
-            return (
-              <Text style={[styles.sectionHeader, { color: colors.mutedForeground, backgroundColor: colors.background }]}>
-                {item.label}
-              </Text>
-            );
-          }
-          return <BuddyRow buddy={item.buddy} index={index} />;
-        }}
+        data={sorted}
+        keyExtractor={(b) => b.id}
+        renderItem={({ item, index }) => (
+          <BuddyCard buddy={item} index={index} myInterests={myInterests} />
+        )}
         contentContainerStyle={[styles.list, isWeb ? { paddingBottom: 34 } : undefined]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!sections.length}
+        scrollEnabled={!!sorted.length}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="people-outline" size={56} color={colors.mutedForeground} />
@@ -209,9 +282,6 @@ export default function BuddiesScreen() {
             </Text>
           </View>
         }
-        ItemSeparatorComponent={() => (
-          <View style={[styles.sep, { backgroundColor: colors.border, marginLeft: 78 }]} />
-        )}
       />
     </View>
   );
@@ -221,52 +291,57 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-  addBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
-  },
+  matchHint: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
+  addBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", marginTop: 4 },
   searchWrap: { paddingHorizontal: 16, paddingVertical: 10 },
   searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    flexDirection: "row", alignItems: "center",
+    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, gap: 8,
   },
   searchInput: { flex: 1, fontSize: 15 },
-  list: { flexGrow: 1 },
-  sectionHeader: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  noInterestsBanner: {
+    flexDirection: "row", alignItems: "center",
+    marginHorizontal: 16, marginBottom: 8,
+    borderRadius: 12, borderWidth: 1, padding: 12, gap: 8,
   },
-  buddyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+  noInterestsText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
+  list: { flexGrow: 1, padding: 12, gap: 10 },
+  card: {
+    borderRadius: 16, borderWidth: 1,
+    padding: 14, gap: 8,
   },
-  buddyInfo: { flex: 1, gap: 3 },
-  buddyNameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  buddyName: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  buddyStatus: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  msgBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
+  cardTop: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  cardInfo: { flex: 1, gap: 3 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  buddyName: { fontSize: 16, fontFamily: "Inter_600SemiBold", flex: 1 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  metaText: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  seatTag: {
+    flexDirection: "row", alignItems: "center", gap: 2,
+    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
   },
-  sep: { height: StyleSheet.hairlineWidth },
+  seatText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  cardActions: { alignItems: "center", gap: 6 },
+  matchBadge: {
+    flexDirection: "row", alignItems: "center", gap: 2,
+    borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  matchCount: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  msgBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  bio: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  sharedRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 5 },
+  sharedLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  moreText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 10 },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 40 },

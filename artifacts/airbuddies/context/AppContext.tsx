@@ -65,6 +65,10 @@ export interface NearbyDevice {
   fingerprint: string;
   signalStrength: number;
   hops: number;
+  interests?: string[];
+  seatNumber?: string;
+  age?: number;
+  gender?: string;
 }
 
 export const INTERESTS = [
@@ -461,11 +465,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsScanning(true);
     setNearbyDevices([]);
     const names = ["Alex", "Emma", "Noah", "Olivia", "James", "Lars", "Noor", "Finn"];
-    const seats = ["3A", "11C", "18B", "24F", "6D", "15E", "9A", "31B"];
+    const seatPool = ["3A", "11C", "18B", "24F", "6D", "15E", "9A", "31B", "22D", "7F"];
+    const genders = ["Man", "Vrouw", "Man", "Vrouw", "Man", "Vrouw", "Anders", "Man"];
+    const ages = [24, 31, 28, 42, 35, 27, 30, 38];
+    const interestPool = [
+      ["Reizen", "Fotografie", "Eten & Drinken"],
+      ["Muziek", "Film & TV", "Gaming"],
+      ["Sport", "Fitness", "Yoga"],
+      ["Technologie", "Ondernemen", "Reizen"],
+      ["Natuur", "Wandelen", "Duiken"],
+      ["Koken", "Wijn", "Cultuur"],
+      ["Kunst", "Mode", "Film & TV"],
+      ["Lezen", "Cultuur", "Reizen"],
+    ];
     let found = 0;
 
     const addDevice = () => {
-      if (found >= 4) { setIsScanning(false); return; }
+      if (found >= 5) { setIsScanning(false); return; }
       const idx = Math.floor(Math.random() * names.length);
       const device: NearbyDevice = {
         id: "nearby_" + generateId(),
@@ -473,13 +489,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fingerprint: generateFingerprint(),
         signalStrength: Math.floor(Math.random() * 40) + 60,
         hops: Math.floor(Math.random() * 3),
+        interests: interestPool[idx % interestPool.length],
+        seatNumber: seatPool[found],
+        age: ages[idx % ages.length],
+        gender: genders[idx % genders.length],
       };
       setNearbyDevices((prev) => [...prev, device]);
       found++;
-      scanTimerRef.current = setTimeout(addDevice, 1000 + Math.random() * 1200);
+      scanTimerRef.current = setTimeout(addDevice, 900 + Math.random() * 1000);
     };
 
-    scanTimerRef.current = setTimeout(addDevice, 700);
+    scanTimerRef.current = setTimeout(addDevice, 600);
   }, []);
 
   const stopScan = useCallback(() => {
