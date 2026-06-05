@@ -98,13 +98,13 @@ export default function OnboardingScreen() {
               </Pressable>
             )}
             <View style={[styles.progressTrack, { backgroundColor: colors.muted, flex: 1 }]}>
-              <Animated.View
+              <View
                 style={[
                   styles.progressFill,
-                  { backgroundColor: colors.primary },
-                  useAnimatedStyle(() => ({
+                  {
+                    backgroundColor: colors.primary,
                     width: `${((step - 1) / (TOTAL_STEPS - 1)) * 100}%`,
-                  })),
+                  },
                 ]}
               />
             </View>
