@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
+import { InviteModal } from "@/components/InviteModal";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import type { Message } from "@/context/AppContext";
@@ -165,6 +166,7 @@ export default function ChatScreen() {
   const { conversations, messages, profile, buddies, sendMessage, sendContactCard, markAsRead, clearChatHistory, leaveGroup } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const isWeb = Platform.OS === "web";
 
   const conv = conversations.find((c) => c.id === id);
@@ -335,6 +337,15 @@ export default function ChatScreen() {
             <Ionicons name="lock-closed" size={11} color={colors.success} />
             <Text style={[styles.encText, { color: colors.success }]}>E2E</Text>
           </View>
+          {isGroup && (
+            <Pressable
+              onPress={() => setShowInvite(true)}
+              style={[styles.inviteBtn, { backgroundColor: colors.primary + "18" }]}
+              testID="invite-button"
+            >
+              <Ionicons name="person-add-outline" size={18} color={colors.primary} />
+            </Pressable>
+          )}
           <Pressable onPress={handleMore} style={styles.moreBtn}>
             <Ionicons name="ellipsis-horizontal" size={22} color={colors.mutedForeground} />
           </Pressable>
@@ -435,6 +446,15 @@ export default function ChatScreen() {
           />
         </Pressable>
       </View>
+
+      {conv && isGroup && (
+        <InviteModal
+          visible={showInvite}
+          onClose={() => setShowInvite(false)}
+          conversationId={conv.id}
+          currentParticipantIds={conv.participantIds}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -465,6 +485,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   encText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  inviteBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   moreBtn: { padding: 4 },
   msgList: { padding: 12, flexGrow: 1, justifyContent: "flex-end" },
   bubbleWrap: { marginVertical: 2 },

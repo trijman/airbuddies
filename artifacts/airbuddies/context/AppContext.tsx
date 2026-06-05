@@ -128,6 +128,7 @@ interface AppContextType {
   startConversation: (buddyId: string) => Conversation;
   markAsRead: (conversationId: string) => void;
   clearChatHistory: (conversationId: string) => void;
+  inviteToGroup: (conversationId: string, buddyIds: string[]) => void;
   leaveGroup: (conversationId: string) => void;
   completeOnboarding: (data: Partial<UserProfile>) => Promise<void>;
 }
@@ -681,6 +682,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const inviteToGroup = useCallback((conversationId: string, buddyIds: string[]) => {
+    setConversations((prev) => {
+      const updated = prev.map((c) => {
+        if (c.id !== conversationId) return c;
+        const newIds = buddyIds.filter((id) => !c.participantIds.includes(id));
+        return { ...c, participantIds: [...c.participantIds, ...newIds] };
+      });
+      saveConversations(updated);
+      return updated;
+    });
+  }, []);
+
   const leaveGroup = useCallback((conversationId: string) => {
     setConversations((prev) => {
       const updated = prev.filter((c) => c.id !== conversationId);
@@ -740,6 +753,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         startConversation,
         markAsRead,
         clearChatHistory,
+        inviteToGroup,
         leaveGroup,
         completeOnboarding,
       }}
