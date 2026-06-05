@@ -19,6 +19,8 @@ import Animated, {
   FadeInDown,
   FadeInRight,
   useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
