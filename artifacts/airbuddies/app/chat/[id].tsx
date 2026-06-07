@@ -92,7 +92,7 @@ function ContactCardBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   );
 }
 
-function MessageBubble({ msg, isMe, senderName, senderSeat }: { msg: Message; isMe: boolean; senderName?: string; senderSeat?: string }) {
+function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: Message; isMe: boolean; senderName?: string; senderSeat?: string; senderId?: string }) {
   const colors = useColors();
 
   if (msg.type === "contact-card") {
@@ -125,7 +125,11 @@ function MessageBubble({ msg, isMe, senderName, senderSeat }: { msg: Message; is
         ]}
       >
         {senderName && !isMe && (
-          <View style={styles.senderRow}>
+          <Pressable
+            style={styles.senderRow}
+            onPress={() => { if (senderId) router.push(`/profile/${senderId}`); }}
+            disabled={!senderId}
+          >
             <Text style={[styles.senderLabel, { color: colors.primary }]}>{senderName}</Text>
             {senderSeat && (
               <View style={styles.senderSeatTag}>
@@ -133,7 +137,7 @@ function MessageBubble({ msg, isMe, senderName, senderSeat }: { msg: Message; is
                 <Text style={[styles.senderSeat, { color: colors.primary + "99" }]}>{senderSeat}</Text>
               </View>
             )}
-          </View>
+          </Pressable>
         )}
         <Text
           style={[
@@ -163,7 +167,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendContactCard, markAsRead, clearChatHistory, leaveGroup } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -245,7 +249,12 @@ export default function ChatScreen() {
   };
 
   const handleMore = () => {
-    const options = [
+    const isFlight = !!conv?.flightNumber;
+    const isPrivateGroup = isGroup && conv?.isPrivate && !isFlight;
+    const isPublicGroup = isGroup && !isPrivateGroup;
+    const isMuted = conv?.muted ?? false;
+
+    const options: Array<{ text: string; style?: "default" | "destructive" | "cancel"; onPress?: () => void }> = [
       {
         text: "Wis chatgeschiedenis",
         onPress: () =>
@@ -254,28 +263,45 @@ export default function ChatScreen() {
             { text: "Verwijder", style: "destructive", onPress: () => clearChatHistory(id ?? "") },
           ]),
       },
-      ...(isGroup
-        ? [
-            {
-              text: "Verlaat groep",
-              style: "destructive" as const,
-              onPress: () =>
-                Alert.alert("Verlaat groep", "Wil je deze groep verlaten?", [
-                  { text: "Annuleer", style: "cancel" },
-                  {
-                    text: "Verlaten",
-                    style: "destructive",
-                    onPress: () => {
-                      leaveGroup(id ?? "");
-                      router.back();
-                    },
-                  },
-                ]),
-            },
-          ]
-        : []),
-      { text: "Annuleer", style: "cancel" as const },
     ];
+
+    if (isPublicGroup || !isGroup) {
+      options.push({
+        text: isMuted ? "Dempen uitzetten" : "Dempen",
+        onPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          muteConversation(id ?? "", !isMuted);
+        },
+      });
+    }
+
+    if (isPrivateGroup) {
+      options.push({
+        text: isMuted ? "Dempen uitzetten" : "Dempen",
+        onPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          muteConversation(id ?? "", !isMuted);
+        },
+      });
+      options.push({
+        text: "Verlaat groep",
+        style: "destructive",
+        onPress: () =>
+          Alert.alert("Verlaat groep", "Wil je deze groep verlaten? Je kunt later niet meer deelnemen.", [
+            { text: "Annuleer", style: "cancel" },
+            {
+              text: "Verlaten",
+              style: "destructive",
+              onPress: () => {
+                leaveGroup(id ?? "");
+                router.back();
+              },
+            },
+          ]),
+      });
+    }
+
+    options.push({ text: "Annuleer", style: "cancel" });
     Alert.alert(title, undefined, options);
   };
 
@@ -301,7 +327,9 @@ export default function ChatScreen() {
         <Pressable
           style={styles.headerCenter}
           onPress={() => {
-            if (!isGroup && conv?.participantIds) {
+            if (isGroup) {
+              router.push(`/group-info/${id}`);
+            } else if (conv?.participantIds) {
               const buddyId = conv.participantIds.find((p) => p !== profile?.id);
               if (buddyId) router.push(`/profile/${buddyId}`);
             }
@@ -360,7 +388,7 @@ export default function ChatScreen() {
           const isMe = item.senderId === profile?.id;
           const senderName = isGroup && !isMe ? getSenderName(item.senderId) : undefined;
           const senderSeat = isGroup && !isMe ? getSenderSeat(item.senderId) : undefined;
-          return <MessageBubble msg={item} isMe={isMe} senderName={senderName} senderSeat={senderSeat} />;
+          return <MessageBubble msg={item} isMe={isMe} senderName={senderName} senderSeat={senderSeat} senderId={isGroup && !isMe ? item.senderId : undefined} />;
         }}
         contentContainerStyle={styles.msgList}
         keyboardDismissMode="interactive"

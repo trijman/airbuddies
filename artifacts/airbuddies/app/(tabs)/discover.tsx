@@ -121,9 +121,14 @@ function DeviceCard({ device, index, myInterests }: { device: NearbyDevice; inde
   );
 }
 
-const ROWS = 30;
-const COLS = ["A", "B", "C", "D", "E", "F"];
-const BUSINESS_ROWS = 5;
+const AIRCRAFT_CONFIGS = {
+  A320: { label: "Airbus A320", rows: 30, cols: ["A","B","C","D","E","F"], aisleBeforeIdx: [3], businessRows: 5 },
+  A321: { label: "Airbus A321", rows: 36, cols: ["A","B","C","D","E","F"], aisleBeforeIdx: [3], businessRows: 5 },
+  B737: { label: "Boeing 737", rows: 32, cols: ["A","B","C","D","E","F"], aisleBeforeIdx: [3], businessRows: 4 },
+  B777: { label: "Boeing 777", rows: 42, cols: ["A","B","C","D","E","F","G","H","J","K"], aisleBeforeIdx: [3, 7], businessRows: 8 },
+  A380: { label: "Airbus A380", rows: 58, cols: ["A","B","C","D","E","F","G","H","J","K"], aisleBeforeIdx: [3, 7], businessRows: 12 },
+} as const;
+type AircraftType = keyof typeof AIRCRAFT_CONFIGS;
 
 interface SeatInfo {
   label: string;
@@ -134,6 +139,8 @@ interface SeatInfo {
 function SeatMap() {
   const colors = useColors();
   const { profile, buddies, nearbyDevices } = useApp();
+  const [aircraftType, setAircraftType] = useState<AircraftType>("A320");
+  const config = AIRCRAFT_CONFIGS[aircraftType];
 
   const seatMap = useMemo(() => {
     const map: Record<string, SeatInfo> = {};
@@ -172,62 +179,98 @@ function SeatMap() {
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.seatMapContent}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[styles.planeNose, { borderBottomColor: colors.border }]} />
-      <View style={styles.cabinWrap}>
-        {Array.from({ length: ROWS }, (_, ri) => {
-          const row = ri + 1;
-          const isBusinessClass = row <= BUSINESS_ROWS;
-          return (
-            <View key={row} style={styles.seatRow}>
-              <Text style={[styles.rowNumber, { color: colors.mutedForeground }]}>{row}</Text>
-              {COLS.map((col, ci) => {
-                const seatKey = `${row}${col}`;
-                const info = seatMap[seatKey];
-                const isAisle = ci === 2;
-                const seatColor = getSeatColor(info);
-                return (
-                  <React.Fragment key={col}>
-                    {isAisle && <View style={styles.aisleGap} />}
-                    <View
-                      style={[
-                        isBusinessClass ? styles.businessSeat : styles.economySeat,
-                        {
-                          backgroundColor: info && info.type !== "empty" ? seatColor + "33" : colors.muted,
-                          borderColor: seatColor,
-                          borderWidth: info && info.type !== "empty" ? 1.5 : 1,
-                        },
-                      ]}
-                    >
-                      {info && info.type !== "empty" && (
-                        <Text style={[
-                          styles.seatInitial,
-                          { color: info.type === "me" ? colors.primary : info.type === "buddy" ? colors.online : colors.nearby }
-                        ]}>
-                          {info.type === "me" ? "★" : (info.name?.[0] ?? "?")}
-                        </Text>
-                      )}
-                    </View>
-                  </React.Fragment>
-                );
-              })}
-              <View style={{ width: 28 }} />
-            </View>
-          );
-        })}
-      </View>
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.aircraftPicker}
+        style={[styles.aircraftPickerWrap, { borderBottomColor: colors.border }]}
+      >
+        {(Object.keys(AIRCRAFT_CONFIGS) as AircraftType[]).map((key) => (
+          <Pressable
+            key={key}
+            onPress={() => setAircraftType(key)}
+            style={[
+              styles.aircraftBtn,
+              {
+                backgroundColor: aircraftType === key ? colors.primary : colors.muted,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.aircraftBtnText,
+                { color: aircraftType === key ? colors.primaryForeground : colors.mutedForeground },
+              ]}
+            >
+              {key}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
-      <View style={[styles.mapLegend, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <LegendItem color={colors.primary} label={`Jij (${profile?.seatNumber ?? "?"})`} />
-        <LegendItem color={colors.online} label="Buddy online" />
-        <LegendItem color={colors.nearby} label="Nabij apparaat" />
-        <LegendItem color={colors.border} label="Leeg" filled={false} />
-      </View>
-    </ScrollView>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.seatMapContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.aircraftLabel, { color: colors.mutedForeground }]}>
+          {config.label} · {config.rows} rijen · {config.cols.length} stoelen per rij
+        </Text>
+        <View style={[styles.planeNose, { borderBottomColor: colors.border }]} />
+        <View style={styles.cabinWrap}>
+          {Array.from({ length: config.rows }, (_, ri) => {
+            const row = ri + 1;
+            const isBusinessClass = row <= config.businessRows;
+            return (
+              <View key={row} style={styles.seatRow}>
+                <Text style={[styles.rowNumber, { color: colors.mutedForeground }]}>{row}</Text>
+                {config.cols.map((col, ci) => {
+                  const seatKey = `${row}${col}`;
+                  const info = seatMap[seatKey];
+                  const isAisleBefore = (config.aisleBeforeIdx as readonly number[]).includes(ci);
+                  const seatColor = getSeatColor(info);
+                  return (
+                    <React.Fragment key={col}>
+                      {isAisleBefore && <View style={styles.aisleGap} />}
+                      <View
+                        style={[
+                          isBusinessClass ? styles.businessSeat : styles.economySeat,
+                          {
+                            backgroundColor: info && info.type !== "empty" ? seatColor + "33" : colors.muted,
+                            borderColor: seatColor,
+                            borderWidth: info && info.type !== "empty" ? 1.5 : 1,
+                          },
+                        ]}
+                      >
+                        {info && info.type !== "empty" && (
+                          <Text
+                            style={[
+                              styles.seatInitial,
+                              { color: info.type === "me" ? colors.primary : info.type === "buddy" ? colors.online : colors.nearby },
+                            ]}
+                          >
+                            {info.type === "me" ? "★" : (info.name?.[0] ?? "?")}
+                          </Text>
+                        )}
+                      </View>
+                    </React.Fragment>
+                  );
+                })}
+                <View style={{ width: 28 }} />
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={[styles.mapLegend, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <LegendItem color={colors.primary} label={`Jij (${profile?.seatNumber ?? "?"})`} />
+          <LegendItem color={colors.online} label="Buddy online" />
+          <LegendItem color={colors.nearby} label="Nabij apparaat" />
+          <LegendItem color={colors.border} label="Leeg" filled={false} />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -477,6 +520,11 @@ const styles = StyleSheet.create({
     borderRadius: 12, borderWidth: 1, padding: 12,
   },
   noSeatText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  aircraftPickerWrap: { borderBottomWidth: StyleSheet.hairlineWidth, maxHeight: 48 },
+  aircraftPicker: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  aircraftBtn: { borderRadius: 16, paddingHorizontal: 14, paddingVertical: 5 },
+  aircraftBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  aircraftLabel: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 12 },
   seatMapContent: { alignItems: "center", paddingVertical: 16, paddingBottom: 40 },
   planeNose: {
     width: 60, height: 30,

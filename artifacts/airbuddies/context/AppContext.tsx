@@ -60,6 +60,8 @@ export interface Conversation {
   isPrivate: boolean;
   flightNumber?: string;
   description?: string;
+  muted?: boolean;
+  adminId?: string;
 }
 
 export interface NearbyDevice {
@@ -129,6 +131,7 @@ interface AppContextType {
   markAsRead: (conversationId: string) => void;
   clearChatHistory: (conversationId: string) => void;
   inviteToGroup: (conversationId: string, buddyIds: string[]) => void;
+  muteConversation: (conversationId: string, muted: boolean) => void;
   leaveGroup: (conversationId: string) => void;
   completeOnboarding: (data: Partial<UserProfile>) => Promise<void>;
 }
@@ -341,6 +344,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isPrivate: false,
         flightNumber: "KL1234",
         description: "Vluchtgroep KL1234 naar Bangkok Suvarnabhumi",
+        adminId: MY_ID,
       },
       {
         id: convPrivateId,
@@ -352,6 +356,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: now - 1000 * 60 * 120,
         avatarSeed: "avontuur",
         isPrivate: true,
+        adminId: MY_ID,
       },
     ];
 
@@ -538,6 +543,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         avatarSeed: options?.flightNumber ?? name,
         isPrivate: options?.isPrivate ?? false,
         flightNumber: options?.flightNumber,
+        adminId: profile.id,
       };
       setConversations((prev) => {
         const updated = [newConv, ...prev];
@@ -682,6 +688,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const muteConversation = useCallback((conversationId: string, muted: boolean) => {
+    setConversations((prev) => {
+      const updated = prev.map((c) =>
+        c.id === conversationId ? { ...c, muted } : c
+      );
+      saveConversations(updated);
+      return updated;
+    });
+  }, []);
+
   const inviteToGroup = useCallback((conversationId: string, buddyIds: string[]) => {
     setConversations((prev) => {
       const updated = prev.map((c) => {
@@ -754,6 +770,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         markAsRead,
         clearChatHistory,
         inviteToGroup,
+        muteConversation,
         leaveGroup,
         completeOnboarding,
       }}

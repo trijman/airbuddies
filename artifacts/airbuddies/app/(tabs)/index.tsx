@@ -139,8 +139,18 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
             >
               {preview}
             </Text>
-            {conv.unreadCount > 0 && (
+            {conv.muted && !conv.unreadCount && (
+              <Ionicons name="notifications-off-outline" size={14} color={colors.mutedForeground} />
+            )}
+            {conv.unreadCount > 0 && !conv.muted && (
               <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
+                  {conv.unreadCount}
+                </Text>
+              </View>
+            )}
+            {conv.unreadCount > 0 && conv.muted && (
+              <View style={[styles.badge, { backgroundColor: colors.mutedForeground }]}>
                 <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
                   {conv.unreadCount}
                 </Text>
