@@ -1,6 +1,9 @@
 export * from "./generated/api";
 // Export only types that don't conflict with Zod schemas in generated/api.ts
 // (Params types for endpoints with query params are excluded — they exist in both)
+export * from './generated/types/adminFlightsList';
+export * from './generated/types/adminFlightSummary';
+export * from './generated/types/adminStats';
 export * from './generated/types/airlineRatingAggregate';
 export * from './generated/types/airlineRatingSummaryItem';
 export * from './generated/types/flightPassengers';

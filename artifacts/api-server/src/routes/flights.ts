@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { db, flightRegistrationsTable, flightRatingsTable } from "@workspace/db";
-import { and, eq, avg, count, sql } from "drizzle-orm";
+import { and, eq, avg, count, countDistinct, min, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -385,6 +385,58 @@ router.get("/flights/ratings/:flightNumber", async (req, res) => {
   const total = Number(agg?.total ?? 0);
   const average = agg?.average ? Math.round(Number(agg.average) * 10) / 10 : null;
   res.json({ flightNumber: fn, flightDate: date ?? null, totalRatings: total, averageRating: average });
+});
+
+// ─── GET /api/admin/stats ─────────────────────────────────────────────────────
+router.get("/admin/stats", async (_req, res) => {
+  const [regStats] = await db
+    .select({
+      totalRegistrations: count(),
+      uniquePassengers: countDistinct(flightRegistrationsTable.deviceId),
+      totalFlights: sql<number>`COUNT(DISTINCT (${flightRegistrationsTable.flightNumber}, ${flightRegistrationsTable.flightDate}))`,
+    })
+    .from(flightRegistrationsTable);
+
+  const [ratingStats] = await db
+    .select({
+      totalRatings: count(),
+      averageGlobalRating: avg(flightRatingsTable.rating),
+    })
+    .from(flightRatingsTable);
+
+  res.json({
+    totalRegistrations: Number(regStats?.totalRegistrations ?? 0),
+    uniquePassengers: Number(regStats?.uniquePassengers ?? 0),
+    totalFlights: Number(regStats?.totalFlights ?? 0),
+    totalRatings: Number(ratingStats?.totalRatings ?? 0),
+    averageGlobalRating: ratingStats?.averageGlobalRating
+      ? Math.round(Number(ratingStats.averageGlobalRating) * 10) / 10
+      : null,
+  });
+});
+
+// ─── GET /api/admin/flights ───────────────────────────────────────────────────
+router.get("/admin/flights", async (_req, res) => {
+  const rows = await db
+    .select({
+      flightNumber: flightRegistrationsTable.flightNumber,
+      flightDate: flightRegistrationsTable.flightDate,
+      passengerCount: count(),
+      firstRegistered: min(flightRegistrationsTable.registeredAt),
+    })
+    .from(flightRegistrationsTable)
+    .groupBy(flightRegistrationsTable.flightNumber, flightRegistrationsTable.flightDate)
+    .orderBy(sql`${flightRegistrationsTable.flightDate} desc, min(${flightRegistrationsTable.registeredAt}) desc`);
+
+  const flights = rows.map((r) => ({
+    flightNumber: r.flightNumber,
+    flightDate: r.flightDate,
+    passengerCount: Number(r.passengerCount),
+    firstRegistered: r.firstRegistered?.toISOString() ?? new Date().toISOString(),
+    iataCode: r.flightNumber.replace(/\d+.*$/, "").toUpperCase() || null,
+  }));
+
+  res.json({ flights, total: flights.length });
 });
 
 // ─── GET /api/ratings/airline/:iataCode ───────────────────────────────────────

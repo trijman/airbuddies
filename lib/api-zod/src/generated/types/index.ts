@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminFlightsList';
+export * from './adminFlightSummary';
+export * from './adminStats';
 export * from './airlineRatingAggregate';
 export * from './airlineRatingSummaryItem';
 export * from './fetchFlightPassengersParams';

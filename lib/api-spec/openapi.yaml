@@ -158,6 +158,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/AirlineRatingAggregate"
 
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get global platform statistics
+      responses:
+        "200":
+          description: Global admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/flights:
+    get:
+      operationId: getAdminFlights
+      tags: [admin]
+      summary: List all registered flights with passenger counts
+      responses:
+        "200":
+          description: Admin flights list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFlightsList"
+
   /ratings/summary:
     get:
       operationId: getRatingsSummary
@@ -352,3 +378,55 @@ components:
       required:
         - summary
         - totalRatingsAllAirlines
+
+    AdminStats:
+      type: object
+      properties:
+        totalRegistrations:
+          type: integer
+        uniquePassengers:
+          type: integer
+        totalRatings:
+          type: integer
+        averageGlobalRating:
+          type: ["number", "null"]
+        totalFlights:
+          type: integer
+      required:
+        - totalRegistrations
+        - uniquePassengers
+        - totalRatings
+        - averageGlobalRating
+        - totalFlights
+
+    AdminFlightSummary:
+      type: object
+      properties:
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+        passengerCount:
+          type: integer
+        firstRegistered:
+          type: string
+        iataCode:
+          type: ["string", "null"]
+      required:
+        - flightNumber
+        - flightDate
+        - passengerCount
+        - firstRegistered
+
+    AdminFlightsList:
+      type: object
+      properties:
+        flights:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFlightSummary"
+        total:
+          type: integer
+      required:
+        - flights
+        - total

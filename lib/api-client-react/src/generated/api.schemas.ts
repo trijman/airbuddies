@@ -91,6 +91,29 @@ export interface RatingsSummary {
   totalRatingsAllAirlines: number;
 }
 
+export interface AdminStats {
+  totalRegistrations: number;
+  uniquePassengers: number;
+  totalRatings: number;
+  /** @nullable */
+  averageGlobalRating: number | null;
+  totalFlights: number;
+}
+
+export interface AdminFlightSummary {
+  flightNumber: string;
+  flightDate: string;
+  passengerCount: number;
+  firstRegistered: string;
+  /** @nullable */
+  iataCode?: string | null;
+}
+
+export interface AdminFlightsList {
+  flights: AdminFlightSummary[];
+  total: number;
+}
+
 export type FetchFlightPassengersParams = {
 date: string;
 };

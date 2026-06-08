@@ -116,6 +116,33 @@ export const GetAirlineRatingsResponse = zod.object({
 
 
 /**
+ * @summary Get global platform statistics
+ */
+export const GetAdminStatsResponse = zod.object({
+  "totalRegistrations": zod.number(),
+  "uniquePassengers": zod.number(),
+  "totalRatings": zod.number(),
+  "averageGlobalRating": zod.number().nullable(),
+  "totalFlights": zod.number()
+})
+
+
+/**
+ * @summary List all registered flights with passenger counts
+ */
+export const GetAdminFlightsResponse = zod.object({
+  "flights": zod.array(zod.object({
+  "flightNumber": zod.string(),
+  "flightDate": zod.string(),
+  "passengerCount": zod.number(),
+  "firstRegistered": zod.string(),
+  "iataCode": zod.string().nullish()
+})),
+  "total": zod.number()
+})
+
+
+/**
  * @summary Get rating summary for all airlines
  */
 export const GetRatingsSummaryResponse = zod.object({
