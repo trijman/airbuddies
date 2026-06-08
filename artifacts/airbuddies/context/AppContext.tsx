@@ -150,6 +150,7 @@ interface AppContextType {
   setActiveAirlineIata: (iata: string | null) => void;
   deleteConversationsByFlightNumber: (flightNumber: string) => void;
   deleteAllConversations: () => void;
+  deleteMessage: (conversationId: string, messageId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -793,6 +794,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const deleteMessage = useCallback((conversationId: string, messageId: string) => {
+    setMessages((prev) => {
+      const updated = {
+        ...prev,
+        [conversationId]: (prev[conversationId] ?? []).filter((m) => m.id !== messageId),
+      };
+      saveMessages(updated);
+      return updated;
+    });
+    setConversations((prev) => {
+      const conv = prev.find((c) => c.id === conversationId);
+      if (!conv || conv.lastMessage?.id !== messageId) return prev;
+      const remaining = (messages[conversationId] ?? []).filter((m) => m.id !== messageId);
+      const newLast = remaining.length ? remaining[remaining.length - 1] : undefined;
+      const updated = prev.map((c) => c.id === conversationId ? { ...c, lastMessage: newLast } : c);
+      saveConversations(updated);
+      return updated;
+    });
+  }, [messages]);
+
   const deleteConversationsByFlightNumber = useCallback((flightNumber: string) => {
     setConversations((prev) => {
       const toDelete = new Set(prev.filter((c) => c.flightNumber === flightNumber).map((c) => c.id));
@@ -885,6 +906,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveAirlineIata,
         deleteConversationsByFlightNumber,
         deleteAllConversations,
+        deleteMessage,
       }}
     >
       {children}

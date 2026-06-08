@@ -7,8 +7,11 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView as RNKeyboardAvoidingView,
+  Linking,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -118,7 +121,13 @@ function SenderLabel({ senderName, senderSeat, senderId }: { senderName?: string
   );
 }
 
-function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: Message; isMe: boolean; senderName?: string; senderSeat?: string; senderId?: string }) {
+function MessageBubble({
+  msg, isMe, senderName, senderSeat, senderId, onImagePress, onLongPress,
+}: {
+  msg: Message; isMe: boolean; senderName?: string; senderSeat?: string; senderId?: string;
+  onImagePress?: (uri: string) => void;
+  onLongPress?: (msg: Message) => void;
+}) {
   const colors = useColors();
 
   if (msg.type === "contact-card") {
@@ -144,20 +153,26 @@ function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: M
         entering={FadeInUp.duration(200)}
         style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
       >
-        <View style={[styles.imageBubble, { borderColor: isMe ? colors.primary : colors.border }]}>
-          <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
-          <Image
-            source={{ uri: msg.attachment.uri }}
-            style={{ width: imgW, height: imgH, borderRadius: 12 }}
-            resizeMode="cover"
-          />
-          <View style={[styles.bubbleMeta, { paddingTop: 4 }]}>
-            <Text style={[styles.bubbleTime, { color: colors.mutedForeground }]}>
-              {formatMsgTime(msg.timestamp)}
-            </Text>
-            {isMe && <StatusIcon status={msg.status} />}
+        <Pressable
+          onPress={() => msg.attachment?.uri && onImagePress?.(msg.attachment.uri)}
+          onLongPress={() => onLongPress?.(msg)}
+          delayLongPress={400}
+        >
+          <View style={[styles.imageBubble, { borderColor: isMe ? colors.primary : colors.border }]}>
+            <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
+            <Image
+              source={{ uri: msg.attachment.uri }}
+              style={{ width: imgW, height: imgH, borderRadius: 12 }}
+              resizeMode="cover"
+            />
+            <View style={[styles.bubbleMeta, { paddingTop: 4 }]}>
+              <Text style={[styles.bubbleTime, { color: colors.mutedForeground }]}>
+                {formatMsgTime(msg.timestamp)}
+              </Text>
+              {isMe && <StatusIcon status={msg.status} />}
+            </View>
           </View>
-        </View>
+        </Pressable>
       </Animated.View>
     );
   }
@@ -170,39 +185,58 @@ function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: M
         entering={FadeInUp.duration(200)}
         style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
       >
-        <View
-          style={[
-            styles.docBubble,
-            {
-              backgroundColor: isMe ? colors.primary : colors.card,
-              borderColor: isMe ? "transparent" : colors.border,
-            },
-          ]}
+        <Pressable
+          onPress={async () => {
+            if (!msg.attachment?.uri) return;
+            try {
+              const canOpen = await Linking.canOpenURL(msg.attachment.uri);
+              if (canOpen) {
+                await Linking.openURL(msg.attachment.uri);
+              } else {
+                Alert.alert("Kan niet openen", "Dit bestandstype wordt niet ondersteund op dit apparaat.");
+              }
+            } catch {
+              Alert.alert("Fout", "Kon het document niet openen.");
+            }
+          }}
+          onLongPress={() => onLongPress?.(msg)}
+          delayLongPress={400}
         >
-          <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
-          <View style={styles.docRow}>
-            <View style={[styles.docIcon, { backgroundColor: isMe ? colors.primaryForeground + "22" : colors.muted }]}>
-              <Ionicons name="document-text" size={22} color={isMe ? colors.primaryForeground : colors.primary} />
+          <View
+            style={[
+              styles.docBubble,
+              {
+                backgroundColor: isMe ? colors.primary : colors.card,
+                borderColor: isMe ? "transparent" : colors.border,
+              },
+            ]}
+          >
+            <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
+            <View style={styles.docRow}>
+              <View style={[styles.docIcon, { backgroundColor: isMe ? colors.primaryForeground + "22" : colors.muted }]}>
+                <Ionicons name="document-text" size={22} color={isMe ? colors.primaryForeground : colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.docName, { color: isMe ? colors.primaryForeground : colors.foreground }]}
+                  numberOfLines={2}
+                >
+                  {msg.attachment.name ?? "Document"}
+                </Text>
+                <Text style={[styles.docMeta, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
+                  {ext}{sizeKB ? ` · ${sizeKB} KB` : ""}
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={isMe ? colors.primaryForeground + "99" : colors.mutedForeground} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.docName, { color: isMe ? colors.primaryForeground : colors.foreground }]}
-                numberOfLines={2}
-              >
-                {msg.attachment.name ?? "Document"}
+            <View style={styles.bubbleMeta}>
+              <Text style={[styles.bubbleTime, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
+                {formatMsgTime(msg.timestamp)}
               </Text>
-              <Text style={[styles.docMeta, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
-                {ext}{sizeKB ? ` · ${sizeKB} KB` : ""}
-              </Text>
+              {isMe && <StatusIcon status={msg.status} />}
             </View>
           </View>
-          <View style={styles.bubbleMeta}>
-            <Text style={[styles.bubbleTime, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
-              {formatMsgTime(msg.timestamp)}
-            </Text>
-            {isMe && <StatusIcon status={msg.status} />}
-          </View>
-        </View>
+        </Pressable>
       </Animated.View>
     );
   }
@@ -253,13 +287,14 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup, deleteMessage } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [seatGate, setSeatGate] = useState(false);
   const [gateInput, setGateInput] = useState("");
   const [savingGate, setSavingGate] = useState(false);
+  const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const isWeb = Platform.OS === "web";
 
   const conv = conversations.find((c) => c.id === id);
@@ -584,7 +619,33 @@ export default function ChatScreen() {
           const isMe = item.senderId === profile?.id;
           const senderName = isGroup && !isMe ? getSenderName(item.senderId) : undefined;
           const senderSeat = isGroup && !isMe ? getSenderSeat(item.senderId) : undefined;
-          return <MessageBubble msg={item} isMe={isMe} senderName={senderName} senderSeat={senderSeat} senderId={isGroup && !isMe ? item.senderId : undefined} />;
+          const handleLongPress = (msg: typeof item) => {
+            if (!isMe) return;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            Alert.alert(
+              "Bericht verwijderen",
+              "Wil je dit bericht verwijderen?",
+              [
+                { text: "Annuleer", style: "cancel" },
+                {
+                  text: "Verwijder",
+                  style: "destructive",
+                  onPress: () => id && deleteMessage(id, msg.id),
+                },
+              ]
+            );
+          };
+          return (
+            <MessageBubble
+              msg={item}
+              isMe={isMe}
+              senderName={senderName}
+              senderSeat={senderSeat}
+              senderId={isGroup && !isMe ? item.senderId : undefined}
+              onImagePress={(uri) => setLightboxUri(uri)}
+              onLongPress={handleLongPress}
+            />
+          );
         }}
         contentContainerStyle={styles.msgList}
         keyboardDismissMode="interactive"
@@ -694,6 +755,28 @@ export default function ChatScreen() {
         />
       )}
 
+      {/* Fullscreen image lightbox */}
+      <Modal
+        visible={!!lightboxUri}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setLightboxUri(null)}
+      >
+        <Pressable style={styles.lightboxOverlay} onPress={() => setLightboxUri(null)}>
+          <View style={styles.lightboxClose}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </View>
+          {lightboxUri && (
+            <Image
+              source={{ uri: lightboxUri }}
+              style={styles.lightboxImage}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
+      </Modal>
+
       {/* Seat gate overlay for public flight chats */}
       {isFlight && seatGate && (
         <RNKeyboardAvoidingView
@@ -793,6 +876,23 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end" },
   bubbleTime: { fontSize: 11 },
+  lightboxOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.93)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  lightboxClose: {
+    position: "absolute",
+    top: 56,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  lightboxImage: {
+    width: "100%",
+    height: "80%",
+  },
   imageBubble: {
     maxWidth: "78%",
     borderRadius: 18,
