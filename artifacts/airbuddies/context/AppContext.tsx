@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { bleService, type AirbuddiesProfile, type AirbuddiesMessage } from "@/services/BLEService";
 
 export type MessageStatus = "sending" | "sent" | "delivered" | "read";
 
@@ -178,100 +179,17 @@ function generateFingerprint(): string {
   return result;
 }
 
-const MY_ID = "me_static_001";
-const MY_FINGERPRINT = "a3:f1:2c:99:4e:b7:d0:11:8a:3c:55:ee:90:12:ab:cd";
-
-const DEMO_BUDDIES: Buddy[] = [
-  {
-    id: "buddy_1",
-    name: "Sophie",
-    publicKey: "pk_sophie_001",
-    fingerprint: generateFingerprint(),
-    isVerified: true,
-    isFavorite: true,
-    isBlocked: false,
-    relation: "buddy",
-    lastSeen: Date.now() - 1000 * 60 * 2,
-    status: "online",
-    age: 28,
-    gender: "Vrouw",
-    bio: "Reiziger, foodie en fotograaf. Altijd op zoek naar de volgende bestemming!",
-    interests: ["Reizen", "Fotografie", "Eten & Drinken", "Cultuur"],
-    seatNumber: "14A",
-  },
-  {
-    id: "buddy_2",
-    name: "Liam",
-    publicKey: "pk_liam_001",
-    fingerprint: generateFingerprint(),
-    isVerified: false,
-    isFavorite: false,
-    isBlocked: false,
-    relation: "buddy",
-    lastSeen: Date.now() - 1000 * 60 * 45,
-    status: "nearby",
-    age: 34,
-    gender: "Man",
-    bio: "Ondernemer en tech-liefhebber. Vaak in de lucht voor werk.",
-    interests: ["Technologie", "Ondernemen", "Muziek"],
-    seatNumber: "22C",
-  },
-  {
-    id: "buddy_3",
-    name: "Mia",
-    publicKey: "pk_mia_001",
-    fingerprint: generateFingerprint(),
-    isVerified: true,
-    isFavorite: false,
-    isBlocked: false,
-    relation: "buddy",
-    lastSeen: Date.now() - 1000 * 60 * 60 * 3,
-    status: "offline",
-    age: 25,
-    gender: "Vrouw",
-    bio: "Duiker en yogadocent. Dol op avontuur.",
-    interests: ["Duiken", "Yoga", "Natuur", "Reizen"],
-    seatNumber: "7F",
-  },
-  {
-    id: "req_1",
-    name: "Lucas",
-    publicKey: "pk_lucas_001",
-    fingerprint: generateFingerprint(),
-    isVerified: false,
-    isFavorite: false,
-    isBlocked: false,
-    relation: "pending_received",
-    lastSeen: Date.now() - 1000 * 60 * 5,
-    status: "nearby",
-    age: 29,
-    gender: "Man",
-    bio: "Muzikant op tournee. Altijd in voor een goed gesprek.",
-    interests: ["Muziek", "Reizen", "Film & TV"],
-    seatNumber: "18B",
-  },
-  {
-    id: "req_2",
-    name: "Yasmin",
-    publicKey: "pk_yasmin_001",
-    fingerprint: generateFingerprint(),
-    isVerified: false,
-    isFavorite: false,
-    isBlocked: false,
-    relation: "pending_received",
-    lastSeen: Date.now() - 1000 * 60 * 12,
-    status: "nearby",
-    age: 31,
-    gender: "Vrouw",
-    bio: "Foodblogger en wijnliefhebber.",
-    interests: ["Eten & Drinken", "Wijn", "Koken", "Reizen"],
-    seatNumber: "9C",
-  },
-];
+async function getOrCreateDeviceId(): Promise<string> {
+  const stored = await AsyncStorage.getItem("device_id_v1");
+  if (stored) return stored;
+  const newId = "dev_" + generateId();
+  await AsyncStorage.setItem("device_id_v1", newId);
+  return newId;
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [buddies, setBuddies] = useState<Buddy[]>(DEMO_BUDDIES);
+  const [buddies, setBuddies] = useState<Buddy[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [nearbyDevices, setNearbyDevices] = useState<NearbyDevice[]>([]);
@@ -280,38 +198,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeAirlineIata, setActiveAirlineIata] = useState<string | null>(null);
   const [activeAircraftType, setActiveAircraftType] = useState<string | null>(null);
   const [activeSeatNumber, setActiveSeatNumber] = useState<string | null>(null);
-  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const profileRef = useRef<UserProfile | null>(null);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     loadData();
+    return () => {
+      bleService.stopScan();
+    };
   }, []);
 
   const loadData = async () => {
     try {
-      const [storedProfile, onboardingDone] = await Promise.all([
-        AsyncStorage.getItem("profile_v2"),
-        AsyncStorage.getItem("onboarding_done_v1"),
-      ]);
+      const deviceId = await getOrCreateDeviceId();
+
+      const [storedProfile, onboardingDone, storedBuddies, storedConvs, storedMsgs] =
+        await Promise.all([
+          AsyncStorage.getItem("profile_v2"),
+          AsyncStorage.getItem("onboarding_done_v1"),
+          AsyncStorage.getItem("buddies_v1"),
+          AsyncStorage.getItem("conversations_v2"),
+          AsyncStorage.getItem("messages_v2"),
+        ]);
 
       setOnboardingComplete(onboardingDone === "1");
 
+      let loadedProfile: UserProfile;
       if (storedProfile) {
-        setProfile(JSON.parse(storedProfile));
+        loadedProfile = { ...JSON.parse(storedProfile), id: deviceId };
+        setProfile(loadedProfile);
       } else {
-        const newProfile: UserProfile = {
-          id: MY_ID,
-          name: "Ik",
-          publicKey: "pk_me_001",
-          fingerprint: MY_FINGERPRINT,
+        loadedProfile = {
+          id: deviceId,
+          name: "Reiziger",
+          publicKey: "pk_" + deviceId,
+          fingerprint: generateFingerprint(),
           interests: [],
           isVisible: true,
           avatarSeed: "me",
         };
-        setProfile(newProfile);
-        await AsyncStorage.setItem("profile_v2", JSON.stringify(newProfile));
+        setProfile(loadedProfile);
+        await AsyncStorage.setItem("profile_v2", JSON.stringify(loadedProfile));
       }
 
-      // Load active airline from registered flights (pick first upcoming, then latest past)
+      if (storedBuddies) {
+        setBuddies(JSON.parse(storedBuddies));
+      }
+
+      if (storedConvs) setConversations(JSON.parse(storedConvs));
+      if (storedMsgs) setMessages(JSON.parse(storedMsgs));
+
       try {
         const storedFlights = await AsyncStorage.getItem("my_flights_v1");
         if (storedFlights) {
@@ -331,93 +271,69 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setActiveSeatNumber(active.seatNumber ?? null);
           }
         }
-      } catch { /* ignore */ }
+      } catch { }
 
-      const storedConvs = await AsyncStorage.getItem("conversations_v2");
-      const storedMsgs = await AsyncStorage.getItem("messages_v2");
-
-      if (storedConvs && storedMsgs) {
-        setConversations(JSON.parse(storedConvs));
-        setMessages(JSON.parse(storedMsgs));
-      } else {
-        const demo = buildDemoData();
-        setConversations(demo.conversations);
-        setMessages(demo.messages);
-        await AsyncStorage.setItem("conversations_v2", JSON.stringify(demo.conversations));
-        await AsyncStorage.setItem("messages_v2", JSON.stringify(demo.messages));
-      }
+      initBLE(loadedProfile);
     } catch (e) {
       setOnboardingComplete(false);
-      const demo = buildDemoData();
-      setConversations(demo.conversations);
-      setMessages(demo.messages);
     }
   };
 
-  const buildDemoData = () => {
-    const now = Date.now();
+  const initBLE = async (userProfile: UserProfile) => {
+    try {
+      bleService.init();
+      const permitted = await bleService.requestPermissions();
+      if (!permitted) return;
 
-    const convSophieId = "conv_sophie";
-    const convFlightId = "conv_kl1234";
-    const convPrivateId = "conv_avontuur";
+      const powered = await bleService.waitForPoweredOn(6000);
+      if (!powered) return;
 
-    const m1: Message = { id: generateId(), conversationId: convSophieId, senderId: "buddy_1", content: "Hey! Ben jij al verbonden via Bluetooth?", timestamp: now - 1000 * 60 * 10, status: "read", type: "text" };
-    const m2: Message = { id: generateId(), conversationId: convSophieId, senderId: MY_ID, content: "Ja! Airbuddies werkt geweldig.", timestamp: now - 1000 * 60 * 8, status: "read", type: "text" };
-    const m3: Message = { id: generateId(), conversationId: convSophieId, senderId: "buddy_1", content: "Top! Geen internet nodig. Zit jij ook in stoel 14B?", timestamp: now - 1000 * 60 * 2, status: "delivered", type: "text" };
+      const bleProfile: AirbuddiesProfile = {
+        id: userProfile.id,
+        name: userProfile.name,
+        fingerprint: userProfile.fingerprint,
+        interests: userProfile.interests,
+        seatNumber: userProfile.seatNumber,
+        age: userProfile.age,
+        gender: userProfile.gender,
+      };
+      bleService.setProfile(bleProfile);
 
-    const f1: Message = { id: generateId(), conversationId: convFlightId, senderId: "buddy_2", content: "Hoi allemaal! Wie gaat er naar Bangkok?", timestamp: now - 1000 * 60 * 35, status: "read", type: "text" };
-    const f2: Message = { id: generateId(), conversationId: convFlightId, senderId: "buddy_3", content: "Ik! Mijn eerste keer Thailand 🌴", timestamp: now - 1000 * 60 * 30, status: "read", type: "text" };
-    const f3: Message = { id: generateId(), conversationId: convFlightId, senderId: "buddy_1", content: "Ik kan goede restauranttips geven voor Bangkok!", timestamp: now - 1000 * 60 * 5, status: "delivered", type: "text" };
+      bleService.setOnMessageReceived((msg: AirbuddiesMessage) => {
+        const incomingMsg: Message = {
+          id: generateId(),
+          conversationId: msg.conversationId,
+          senderId: msg.fromId,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          status: "delivered",
+          type: (msg.type as Message["type"]) ?? "text",
+        };
 
-    const g1: Message = { id: generateId(), conversationId: convPrivateId, senderId: "buddy_2", content: "Wie gaat er mee op avontuur?", timestamp: now - 1000 * 60 * 30, status: "read", type: "text" };
-    const g2: Message = { id: generateId(), conversationId: convPrivateId, senderId: MY_ID, content: "Ik doe mee!", timestamp: now - 1000 * 60 * 25, status: "read", type: "text" };
+        setMessages((prev) => {
+          const updated = {
+            ...prev,
+            [msg.conversationId]: [...(prev[msg.conversationId] ?? []), incomingMsg],
+          };
+          AsyncStorage.setItem("messages_v2", JSON.stringify(updated));
+          return updated;
+        });
 
-    const conversations: Conversation[] = [
-      {
-        id: convSophieId,
-        type: "direct",
-        participantIds: [MY_ID, "buddy_1"],
-        lastMessage: m3,
-        unreadCount: 1,
-        createdAt: now - 1000 * 60 * 60,
-        avatarSeed: "sophie",
-        isPrivate: false,
-      },
-      {
-        id: convFlightId,
-        type: "group",
-        name: "KL1234 ✈ Bangkok",
-        participantIds: [MY_ID, "buddy_1", "buddy_2", "buddy_3"],
-        lastMessage: f3,
-        unreadCount: 2,
-        createdAt: now - 1000 * 60 * 90,
-        avatarSeed: "kl1234",
-        isPrivate: false,
-        flightNumber: "KL1234",
-        description: "Vluchtgroep KL1234 naar Bangkok Suvarnabhumi",
-        adminId: MY_ID,
-      },
-      {
-        id: convPrivateId,
-        type: "group",
-        name: "Avontuurclub",
-        participantIds: [MY_ID, "buddy_2", "buddy_3"],
-        lastMessage: g2,
-        unreadCount: 0,
-        createdAt: now - 1000 * 60 * 120,
-        avatarSeed: "avontuur",
-        isPrivate: true,
-        adminId: MY_ID,
-      },
-    ];
+        setConversations((prev) => {
+          const updated = prev.map((c) =>
+            c.id === msg.conversationId
+              ? { ...c, lastMessage: incomingMsg, unreadCount: c.unreadCount + 1 }
+              : c
+          );
+          AsyncStorage.setItem("conversations_v2", JSON.stringify(updated));
+          return updated;
+        });
+      });
 
-    const messages: Record<string, Message[]> = {
-      [convSophieId]: [m1, m2, m3],
-      [convFlightId]: [f1, f2, f3],
-      [convPrivateId]: [g1, g2],
-    };
-
-    return { conversations, messages };
+      await bleService.startAdvertising();
+    } catch (e) {
+      console.warn("[BLE] Init error:", e);
+    }
   };
 
   const saveConversations = async (convs: Conversation[]) => {
@@ -428,13 +344,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("messages_v2", JSON.stringify(msgs));
   };
 
+  const saveBuddies = async (b: Buddy[]) => {
+    await AsyncStorage.setItem("buddies_v1", JSON.stringify(b));
+  };
+
   const sendMessage = useCallback(
     async (conversationId: string, content: string) => {
-      if (!profile) return;
+      const currentProfile = profileRef.current;
+      if (!currentProfile) return;
+
       const newMsg: Message = {
         id: generateId(),
         conversationId,
-        senderId: profile.id,
+        senderId: currentProfile.id,
         content,
         timestamp: Date.now(),
         status: "sending",
@@ -455,26 +377,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return updated;
       });
 
-      setTimeout(() => {
+      const updateStatus = (status: MessageStatus) => {
         setMessages((prev) => {
-          const convMsgs = prev[conversationId] ?? [];
           const updated = {
             ...prev,
-            [conversationId]: convMsgs.map((m) =>
-              m.id === newMsg.id ? { ...m, status: "delivered" as MessageStatus } : m
+            [conversationId]: (prev[conversationId] ?? []).map((m) =>
+              m.id === newMsg.id ? { ...m, status } : m
             ),
           };
           saveMessages(updated);
           return updated;
         });
-      }, 800);
+      };
+
+      const conv = conversations.find((c) => c.id === conversationId);
+      const recipientId = conv?.type === "direct"
+        ? conv.participantIds.find((id) => id !== currentProfile.id)
+        : undefined;
+
+      if (recipientId) {
+        const bleMsg: AirbuddiesMessage = {
+          fromId: currentProfile.id,
+          content,
+          timestamp: newMsg.timestamp,
+          conversationId,
+          type: "text",
+        };
+        const delivered = await bleService.sendMessageViaBLE(recipientId, bleMsg);
+        updateStatus(delivered ? "delivered" : "sent");
+      } else {
+        setTimeout(() => updateStatus("sent"), 500);
+      }
     },
-    [profile]
+    [conversations]
   );
 
   const sendMediaMessage = useCallback(
     async (conversationId: string, attachment: MediaAttachment, caption = "") => {
-      if (!profile) return;
+      const currentProfile = profileRef.current;
+      if (!currentProfile) return;
       const label =
         attachment.type === "image" ? (caption || "📷 Afbeelding")
         : attachment.type === "document" ? (attachment.name ?? "📄 Document")
@@ -482,7 +423,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const newMsg: Message = {
         id: generateId(),
         conversationId,
-        senderId: profile.id,
+        senderId: currentProfile.id,
         content: label,
         timestamp: Date.now(),
         status: "sending",
@@ -503,11 +444,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       setTimeout(() => {
         setMessages((prev) => {
-          const convMsgs = prev[conversationId] ?? [];
           const updated = {
             ...prev,
-            [conversationId]: convMsgs.map((m) =>
-              m.id === newMsg.id ? { ...m, status: "delivered" as MessageStatus } : m
+            [conversationId]: (prev[conversationId] ?? []).map((m) =>
+              m.id === newMsg.id ? { ...m, status: "sent" as MessageStatus } : m
             ),
           };
           saveMessages(updated);
@@ -515,34 +455,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       }, 700);
     },
-    [profile]
+    []
   );
 
   const sendContactCard = useCallback(
     async (conversationId: string) => {
-      if (!profile) return;
+      const currentProfile = profileRef.current;
+      if (!currentProfile) return;
       const cardMsg: Message = {
         id: generateId(),
         conversationId,
-        senderId: profile.id,
-        content: `Contactkaart van ${profile.name}`,
+        senderId: currentProfile.id,
+        content: `Contactkaart van ${currentProfile.name}`,
         timestamp: Date.now(),
         status: "sending",
         type: "contact-card",
         contactData: {
-          name: profile.name,
-          phone: profile.phone,
-          email: profile.email,
-          instagram: profile.instagram,
+          name: currentProfile.name,
+          phone: currentProfile.phone,
+          email: currentProfile.email,
+          instagram: currentProfile.instagram,
         },
       };
-
       setMessages((prev) => {
         const updated = { ...prev, [conversationId]: [...(prev[conversationId] ?? []), cardMsg] };
         saveMessages(updated);
         return updated;
       });
-
       setConversations((prev) => {
         const updated = prev.map((c) =>
           c.id === conversationId ? { ...c, lastMessage: cardMsg } : c
@@ -550,14 +489,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveConversations(updated);
         return updated;
       });
-
       setTimeout(() => {
         setMessages((prev) => {
-          const convMsgs = prev[conversationId] ?? [];
           const updated = {
             ...prev,
-            [conversationId]: convMsgs.map((m) =>
-              m.id === cardMsg.id ? { ...m, status: "delivered" as MessageStatus } : m
+            [conversationId]: (prev[conversationId] ?? []).map((m) =>
+              m.id === cardMsg.id ? { ...m, status: "sent" as MessageStatus } : m
             ),
           };
           saveMessages(updated);
@@ -565,7 +502,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       }, 600);
     },
-    [profile]
+    []
   );
 
   const addBuddy = useCallback(
@@ -573,20 +510,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const newBuddy: Buddy = { ...buddy, isVerified: false, isFavorite: false, isBlocked: false, relation: "buddy" };
       setBuddies((prev) => {
         if (prev.find((b) => b.id === buddy.id)) return prev;
-        return [...prev, newBuddy];
+        const updated = [...prev, newBuddy];
+        saveBuddies(updated);
+        return updated;
       });
     },
     []
   );
 
   const removeBuddy = useCallback((buddyId: string) => {
-    setBuddies((prev) => prev.filter((b) => b.id !== buddyId));
+    setBuddies((prev) => {
+      const updated = prev.filter((b) => b.id !== buddyId);
+      saveBuddies(updated);
+      return updated;
+    });
   }, []);
 
   const toggleFavorite = useCallback((buddyId: string) => {
-    setBuddies((prev) =>
-      prev.map((b) => (b.id === buddyId ? { ...b, isFavorite: !b.isFavorite } : b))
-    );
+    setBuddies((prev) => {
+      const updated = prev.map((b) => (b.id === buddyId ? { ...b, isFavorite: !b.isFavorite } : b));
+      saveBuddies(updated);
+      return updated;
+    });
   }, []);
 
   const sendBuddyRequest = useCallback((device: NearbyDevice) => {
@@ -608,19 +553,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setBuddies((prev) => {
       if (prev.find((b) => b.id === device.id)) return prev;
-      return [...prev, newBuddy];
+      const updated = [...prev, newBuddy];
+      saveBuddies(updated);
+      return updated;
     });
     setNearbyDevices((prev) => prev.filter((d) => d.id !== device.id));
   }, []);
 
   const acceptBuddyRequest = useCallback((buddyId: string) => {
-    setBuddies((prev) =>
-      prev.map((b) => (b.id === buddyId ? { ...b, relation: "buddy" as BuddyRelation } : b))
-    );
+    setBuddies((prev) => {
+      const updated = prev.map((b) => (b.id === buddyId ? { ...b, relation: "buddy" as BuddyRelation } : b));
+      saveBuddies(updated);
+      return updated;
+    });
   }, []);
 
   const declineBuddyRequest = useCallback((buddyId: string) => {
-    setBuddies((prev) => prev.filter((b) => b.id !== buddyId));
+    setBuddies((prev) => {
+      const updated = prev.filter((b) => b.id !== buddyId);
+      saveBuddies(updated);
+      return updated;
+    });
   }, []);
 
   const createGroup = useCallback(
@@ -629,18 +582,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       memberIds: string[],
       options?: { isPrivate?: boolean; flightNumber?: string }
     ): Conversation => {
-      if (!profile) throw new Error("No profile");
+      const currentProfile = profileRef.current;
+      if (!currentProfile) throw new Error("No profile");
       const newConv: Conversation = {
         id: "group_" + generateId(),
         type: "group",
         name,
-        participantIds: [profile.id, ...memberIds],
+        participantIds: [currentProfile.id, ...memberIds],
         unreadCount: 0,
         createdAt: Date.now(),
         avatarSeed: options?.flightNumber ?? name,
         isPrivate: options?.isPrivate ?? false,
         flightNumber: options?.flightNumber,
-        adminId: profile.id,
+        adminId: currentProfile.id,
       };
       setConversations((prev) => {
         const updated = [newConv, ...prev];
@@ -649,53 +603,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return newConv;
     },
-    [profile]
+    []
   );
 
   const startScan = useCallback(() => {
     setIsScanning(true);
     setNearbyDevices([]);
-    const names = ["Alex", "Emma", "Noah", "Olivia", "James", "Lars", "Noor", "Finn"];
-    const seatPool = ["3A", "11C", "18B", "24F", "6D", "15E", "9A", "31B", "22D", "7F"];
-    const genders = ["Man", "Vrouw", "Man", "Vrouw", "Man", "Vrouw", "Anders", "Man"];
-    const ages = [24, 31, 28, 42, 35, 27, 30, 38];
-    const interestPool = [
-      ["Reizen", "Fotografie", "Eten & Drinken"],
-      ["Muziek", "Film & TV", "Gaming"],
-      ["Sport", "Fitness", "Yoga"],
-      ["Technologie", "Ondernemen", "Reizen"],
-      ["Natuur", "Wandelen", "Duiken"],
-      ["Koken", "Wijn", "Cultuur"],
-      ["Kunst", "Mode", "Film & TV"],
-      ["Lezen", "Cultuur", "Reizen"],
-    ];
-    let found = 0;
 
-    const addDevice = () => {
-      if (found >= 5) { setIsScanning(false); return; }
-      const idx = Math.floor(Math.random() * names.length);
+    bleService.setOnDeviceFound((bleProfile, rssi) => {
       const device: NearbyDevice = {
-        id: "nearby_" + generateId(),
-        name: names[idx],
-        fingerprint: generateFingerprint(),
-        signalStrength: Math.floor(Math.random() * 40) + 60,
-        hops: Math.floor(Math.random() * 3),
-        interests: interestPool[idx % interestPool.length],
-        seatNumber: seatPool[found],
-        age: ages[idx % ages.length],
-        gender: genders[idx % genders.length],
+        id: bleProfile.id,
+        name: bleProfile.name,
+        fingerprint: bleProfile.fingerprint,
+        signalStrength: rssi,
+        hops: 0,
+        interests: bleProfile.interests,
+        seatNumber: bleProfile.seatNumber,
+        age: bleProfile.age,
+        gender: bleProfile.gender,
       };
-      setNearbyDevices((prev) => [...prev, device]);
-      found++;
-      scanTimerRef.current = setTimeout(addDevice, 900 + Math.random() * 1000);
-    };
+      setNearbyDevices((prev) => {
+        if (prev.find((d) => d.id === device.id)) return prev;
+        return [...prev, device];
+      });
+    });
 
-    scanTimerRef.current = setTimeout(addDevice, 600);
+    bleService.startScan();
   }, []);
 
   const stopScan = useCallback(() => {
     setIsScanning(false);
-    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    bleService.stopScan();
   }, []);
 
   const acceptNearbyDevice = useCallback((device: NearbyDevice) => {
@@ -706,6 +644,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fingerprint: device.fingerprint,
       lastSeen: Date.now(),
       status: "nearby",
+      interests: device.interests,
+      seatNumber: device.seatNumber,
+      age: device.age,
+      gender: device.gender,
     });
     setNearbyDevices((prev) => prev.filter((d) => d.id !== device.id));
   }, [addBuddy]);
@@ -715,6 +657,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!prev) return prev;
       const updated = { ...prev, ...data };
       AsyncStorage.setItem("profile_v2", JSON.stringify(updated));
+      const bleProfile: AirbuddiesProfile = {
+        id: updated.id,
+        name: updated.name,
+        fingerprint: updated.fingerprint,
+        interests: updated.interests,
+        seatNumber: updated.seatNumber,
+        age: updated.age,
+        gender: updated.gender,
+      };
+      bleService.setProfile(bleProfile);
       return updated;
     });
   }, []);
@@ -724,6 +676,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!prev) return prev;
       const updated = { ...prev, isVisible: !prev.isVisible };
       AsyncStorage.setItem("profile_v2", JSON.stringify(updated));
+      if (updated.isVisible) {
+        bleService.startAdvertising().catch(() => {});
+      } else {
+        bleService.stopAdvertising().catch(() => {});
+      }
       return updated;
     });
   }, []);
@@ -740,11 +697,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         (c) => c.type === "direct" && c.participantIds.includes(buddyId)
       );
       if (existing) return existing;
-      if (!profile) throw new Error("No profile");
+      const currentProfile = profileRef.current;
+      if (!currentProfile) throw new Error("No profile");
       const newConv: Conversation = {
         id: "direct_" + generateId(),
         type: "direct",
-        participantIds: [profile.id, buddyId],
+        participantIds: [currentProfile.id, buddyId],
         unreadCount: 0,
         createdAt: Date.now(),
         avatarSeed: buddyId,
@@ -757,7 +715,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return newConv;
     },
-    [conversations, profile]
+    [conversations]
   );
 
   const markAsRead = useCallback((conversationId: string) => {
@@ -908,7 +866,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setActiveAircraftType(active.flightInfo?.aircraftType ?? null);
         setActiveSeatNumber(active.seatNumber ?? null);
       }
-    } catch { /* ignore */ }
+    } catch { }
   }, []);
 
   const deleteConversationsByFlightNumber = useCallback((flightNumber: string) => {
@@ -950,10 +908,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const completeOnboarding = useCallback(async (data: Partial<UserProfile>) => {
+    const deviceId = await getOrCreateDeviceId();
     const completed: UserProfile = {
-      id: MY_ID,
-      publicKey: "pk_me_001",
-      fingerprint: MY_FINGERPRINT,
+      id: deviceId,
+      publicKey: "pk_" + deviceId,
+      fingerprint: generateFingerprint(),
       isVisible: true,
       interests: [],
       name: "Reiziger",
@@ -964,6 +923,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("profile_v2", JSON.stringify(completed));
     await AsyncStorage.setItem("onboarding_done_v1", "1");
     setOnboardingComplete(true);
+
+    const bleProfile: AirbuddiesProfile = {
+      id: completed.id,
+      name: completed.name,
+      fingerprint: completed.fingerprint,
+      interests: completed.interests,
+      seatNumber: completed.seatNumber,
+      age: completed.age,
+      gender: completed.gender,
+    };
+    bleService.setProfile(bleProfile);
+    bleService.startAdvertising().catch(() => {});
   }, []);
 
   return (
