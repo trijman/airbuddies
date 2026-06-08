@@ -297,14 +297,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem("profile_v2", JSON.stringify(newProfile));
       }
 
-      // Load active airline from registered flights
+      // Load active airline from registered flights (pick first upcoming, then latest past)
       try {
         const storedFlights = await AsyncStorage.getItem("my_flights_v1");
         if (storedFlights) {
-          const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string } }> = JSON.parse(storedFlights);
-          const today = new Date().toISOString().slice(0, 10);
-          const active = flights.find((f) => f.flightDate === today)
-            ?? flights.sort((a, b) => a.flightDate.localeCompare(b.flightDate))[0];
+          const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string; scheduledDeparture?: string | null } }> = JSON.parse(storedFlights);
+          const now = new Date();
+          const sorted = [...flights].sort((a, b) => {
+            const aT = a.flightInfo?.scheduledDeparture ?? `${a.flightDate}T23:59:59`;
+            const bT = b.flightInfo?.scheduledDeparture ?? `${b.flightDate}T23:59:59`;
+            return aT.localeCompare(bT);
+          });
+          const active = sorted.find((f) => new Date(f.flightInfo?.scheduledDeparture ?? `${f.flightDate}T23:59:59`) > now)
+            ?? sorted[sorted.length - 1];
           if (active) {
             const iata = active.flightInfo?.iataCode ?? active.flightNumber.slice(0, 2).toUpperCase();
             setActiveAirlineIata(iata);

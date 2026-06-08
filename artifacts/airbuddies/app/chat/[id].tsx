@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp } from "react-native-reanimated";
@@ -255,10 +256,45 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [seatGate, setSeatGate] = useState(false);
+  const [gateInput, setGateInput] = useState("");
+  const [savingGate, setSavingGate] = useState(false);
   const isWeb = Platform.OS === "web";
 
   const conv = conversations.find((c) => c.id === id);
   const convMessages = messages[id ?? ""] ?? [];
+
+  // ── Seat gate: check if user has a seat number for this flight ──────────
+  useFocusEffect(
+    useCallback(() => {
+      if (!conv?.flightNumber) { setSeatGate(false); return; }
+      AsyncStorage.getItem("my_flights_v1").then((stored) => {
+        if (!stored) { setSeatGate(true); return; }
+        const flights: Array<{ flightNumber: string; seatNumber?: string }> = JSON.parse(stored);
+        const match = flights.find((f) => f.flightNumber === conv.flightNumber);
+        setSeatGate(!match?.seatNumber);
+      }).catch(() => setSeatGate(false));
+    }, [conv?.flightNumber])
+  );
+
+  const handleSeatGateConfirm = async () => {
+    if (!gateInput.trim() || !conv?.flightNumber) return;
+    setSavingGate(true);
+    try {
+      const stored = await AsyncStorage.getItem("my_flights_v1");
+      if (stored) {
+        const flights = JSON.parse(stored);
+        const updated = flights.map((f: { flightNumber: string }) =>
+          f.flightNumber === conv.flightNumber ? { ...f, seatNumber: gateInput.trim().toUpperCase() } : f
+        );
+        await AsyncStorage.setItem("my_flights_v1", JSON.stringify(updated));
+      }
+      setGateInput("");
+      setSeatGate(false);
+    } finally {
+      setSavingGate(false);
+    }
+  };
 
   const { title, isOnline, isNearby, isFlight, memberCount } = useMemo(() => {
     if (!conv) return { title: "Chat", isOnline: false, isNearby: false, isFlight: false, memberCount: 0 };
@@ -656,6 +692,47 @@ export default function ChatScreen() {
           currentParticipantIds={conv.participantIds}
         />
       )}
+
+      {/* Seat gate overlay for public flight chats */}
+      {isFlight && seatGate && (
+        <View style={[styles.seatGate, { backgroundColor: colors.background }]}>
+          <Ionicons name="airplane" size={48} color={colors.primary} style={{ marginBottom: 8 }} />
+          <Text style={[styles.seatGateTitle, { color: colors.foreground }]}>Stoelnummer vereist</Text>
+          <Text style={[styles.seatGateSub, { color: colors.mutedForeground }]}>
+            Vul eerst je stoelnummer in om mee te doen aan de vluchtchat. Zo weet iedereen waar je zit.
+          </Text>
+          <TextInput
+            style={[
+              styles.seatGateInput,
+              {
+                color: colors.foreground,
+                borderColor: gateInput ? colors.primary : colors.border,
+                backgroundColor: colors.card,
+              },
+            ]}
+            placeholder="bijv. 14A"
+            placeholderTextColor={colors.mutedForeground}
+            value={gateInput}
+            onChangeText={(t) => setGateInput(t.toUpperCase())}
+            autoCapitalize="characters"
+            maxLength={5}
+            returnKeyType="done"
+            onSubmitEditing={handleSeatGateConfirm}
+            autoFocus
+          />
+          <Pressable
+            style={[
+              styles.seatGateBtn,
+              { backgroundColor: colors.primary, opacity: gateInput.trim() && !savingGate ? 1 : 0.45 },
+            ]}
+            onPress={handleSeatGateConfirm}
+            disabled={!gateInput.trim() || savingGate}
+          >
+            <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
+            <Text style={styles.seatGateBtnText}>Deelnemen aan vluchtchat</Text>
+          </Pressable>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -785,4 +862,36 @@ const styles = StyleSheet.create({
   },
   emptyChat: { alignItems: "center", gap: 8, paddingTop: 60 },
   emptyChatText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
+  seatGate: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 36,
+    gap: 12,
+  },
+  seatGateTitle: { fontSize: 22, fontFamily: "Inter_700Bold", textAlign: "center" },
+  seatGateSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, marginBottom: 8 },
+  seatGateInput: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 4,
+    textAlign: "center",
+  },
+  seatGateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: "100%",
+    marginTop: 4,
+  },
+  seatGateBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

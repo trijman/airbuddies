@@ -76,6 +76,19 @@ const DEFAULT_BRAND: AirlineBrand = {
   textColor: "#fff",
 };
 
+function pickActiveFlight(flights: RegisteredFlight[]): RegisteredFlight | null {
+  if (!flights.length) return null;
+  const now = new Date();
+  const sorted = [...flights].sort((a, b) => {
+    const aT = a.flightInfo?.scheduledDeparture ?? `${a.flightDate}T23:59:59`;
+    const bT = b.flightInfo?.scheduledDeparture ?? `${b.flightDate}T23:59:59`;
+    return aT.localeCompare(bT);
+  });
+  return sorted.find((f) => new Date(f.flightInfo?.scheduledDeparture ?? `${f.flightDate}T23:59:59`) > now)
+    ?? sorted[sorted.length - 1]
+    ?? null;
+}
+
 function getAirlineBrand(iataCode?: string | null): AirlineBrand {
   if (!iataCode) return DEFAULT_BRAND;
   return AIRLINE_BRANDS[iataCode.toUpperCase()] ?? DEFAULT_BRAND;
@@ -205,10 +218,7 @@ export default function AirlineScreen() {
       if (!stored) { setLoading(false); return; }
 
       const flights: RegisteredFlight[] = JSON.parse(stored);
-      const today = new Date().toISOString().slice(0, 10);
-      const todayFlight = flights.find((f) => f.flightDate === today)
-        ?? flights.sort((a, b) => a.flightDate.localeCompare(b.flightDate))[0]
-        ?? null;
+      const todayFlight = pickActiveFlight(flights);
 
       if (!todayFlight) { setActiveFlight(null); setLoading(false); return; }
 

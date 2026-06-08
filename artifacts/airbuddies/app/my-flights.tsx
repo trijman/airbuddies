@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -32,6 +33,7 @@ interface RegisteredFlight {
   passengerName?: string;
   registeredAt: string;
   flightInfo?: FlightInfo;
+  seatNumber?: string;
 }
 
 interface FlightInfo {
@@ -246,6 +248,10 @@ export default function MyFlightsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { profile, createGroup, setActiveAirlineIata } = useApp();
+  const [seatModalVisible, setSeatModalVisible] = useState(false);
+  const [pendingSeatFlight, setPendingSeatFlight] = useState<RegisteredFlight | null>(null);
+  const [seatInput, setSeatInput] = useState("");
+  const [pendingCount, setPendingCount] = useState<{ count: number; flightNumber: string } | null>(null);
   const isWeb = Platform.OS === "web";
 
   const topPad = isWeb ? 67 : insets.top;
@@ -414,11 +420,10 @@ export default function MyFlightsScreen() {
       setFlightNumber("");
       setSearchResult(null);
 
-      if (count.count > 1) {
-        Alert.alert("Aangemeld! 🎉", `${count.count} mensen hebben zich aangemeld voor ${fn}. Je kunt straks met ze chatten via de app!`);
-      } else {
-        Alert.alert("Aangemeld!", `We laten je weten als anderen ${fn} ook aanmelden.`);
-      }
+      setPendingSeatFlight(newFlight);
+      setPendingCount({ count: count.count, flightNumber: fn });
+      setSeatInput("");
+      setSeatModalVisible(true);
     } catch {
       Alert.alert("Verbindingsfout", "Kon niet verbinden met de server. Controleer je internetverbinding.");
     } finally {
@@ -461,6 +466,39 @@ export default function MyFlightsScreen() {
       flightNumber: flight.flightNumber,
     });
     router.push(`/chat/${conv.id}`);
+  };
+
+  const showPassengerAlert = (count: number, fn: string) => {
+    if (count > 1) {
+      Alert.alert("Aangemeld! 🎉", `${count} mensen hebben zich aangemeld voor ${fn}. Je kunt straks met ze chatten via de app!`);
+    } else {
+      Alert.alert("Aangemeld!", `We laten je weten als anderen ${fn} ook aanmelden.`);
+    }
+  };
+
+  const handleConfirmSeat = async () => {
+    if (!pendingSeatFlight || !seatInput.trim()) return;
+    const updated = registeredFlights.map((f) =>
+      f.flightNumber === pendingSeatFlight.flightNumber && f.flightDate === pendingSeatFlight.flightDate
+        ? { ...f, seatNumber: seatInput.trim().toUpperCase() }
+        : f
+    );
+    await saveRegisteredFlights(updated);
+    setSeatModalVisible(false);
+    if (pendingCount) {
+      showPassengerAlert(pendingCount.count, pendingCount.flightNumber);
+      setPendingCount(null);
+    }
+    setPendingSeatFlight(null);
+  };
+
+  const handleSkipSeat = () => {
+    setSeatModalVisible(false);
+    if (pendingCount) {
+      showPassengerAlert(pendingCount.count, pendingCount.flightNumber);
+      setPendingCount(null);
+    }
+    setPendingSeatFlight(null);
   };
 
   const flightsByDate = registeredFlights.reduce<Record<string, RegisteredFlight[]>>((acc, f) => {
@@ -695,6 +733,41 @@ export default function MyFlightsScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Seat Number Modal */}
+      <Modal visible={seatModalVisible} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.seatOverlay}>
+          <View style={[styles.seatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="airplane-outline" size={32} color={colors.primary} style={{ alignSelf: "center", marginBottom: 4 }} />
+            <Text style={[styles.seatCardTitle, { color: colors.foreground }]}>Wat is jouw stoelnummer?</Text>
+            <Text style={[styles.seatCardSub, { color: colors.mutedForeground }]}>
+              Vlucht {pendingSeatFlight?.flightNumber} · stoelnummer is zichtbaar in de vluchtchat
+            </Text>
+            <TextInput
+              style={[styles.seatInput, { color: colors.foreground, borderColor: seatInput ? colors.primary : colors.border, backgroundColor: colors.background }]}
+              placeholder="bijv. 14A"
+              placeholderTextColor={colors.mutedForeground}
+              value={seatInput}
+              onChangeText={(t) => setSeatInput(t.toUpperCase())}
+              autoCapitalize="characters"
+              autoFocus
+              maxLength={5}
+              returnKeyType="done"
+              onSubmitEditing={handleConfirmSeat}
+            />
+            <Pressable
+              style={[styles.seatConfirmBtn, { backgroundColor: colors.primary, opacity: seatInput.trim() ? 1 : 0.45 }]}
+              onPress={handleConfirmSeat}
+              disabled={!seatInput.trim()}
+            >
+              <Text style={styles.seatConfirmText}>Bevestig stoelnummer</Text>
+            </Pressable>
+            <Pressable onPress={handleSkipSeat} style={styles.seatSkipBtn}>
+              <Text style={[styles.seatSkipText, { color: colors.mutedForeground }]}>Weet ik nog niet</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -863,4 +936,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   unregisterText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  seatOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  seatCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 28,
+    gap: 12,
+  },
+  seatCardTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
+  seatCardSub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 18 },
+  seatInput: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 3,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  seatConfirmBtn: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  seatConfirmText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  seatSkipBtn: { alignItems: "center", paddingVertical: 8 },
+  seatSkipText: { fontSize: 14, fontFamily: "Inter_400Regular" },
 });
