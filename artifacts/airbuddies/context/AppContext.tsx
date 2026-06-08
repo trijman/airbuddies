@@ -216,6 +216,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const deviceId = await getOrCreateDeviceId();
 
+      // Migrate: clear old demo data from previous app versions
+      const schemaVersion = await AsyncStorage.getItem("schema_version");
+      if (schemaVersion !== "3") {
+        await AsyncStorage.multiRemove([
+          "conversations_v2",
+          "messages_v2",
+          "buddies_v1",
+        ]);
+        await AsyncStorage.setItem("schema_version", "3");
+      }
+
       const [storedProfile, onboardingDone, storedBuddies, storedConvs, storedMsgs] =
         await Promise.all([
           AsyncStorage.getItem("profile_v2"),
