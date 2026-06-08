@@ -200,11 +200,15 @@ export default function AirlineScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { conversations, profile, createGroup } = useApp();
+  const deviceId = profile?.id ?? "me_static_001";
   const [activeSection, setActiveSection] = useState<Section>("vlucht");
   const [orderItems, setOrderItems] = useState<string[]>([]);
   const [activeFlight, setActiveFlight] = useState<RegisteredFlight | null>(null);
   const [flightInfo, setFlightInfo] = useState<FlightInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [flightRating, setFlightRating] = useState<number | null>(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
 
@@ -263,12 +267,80 @@ export default function AirlineScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadActiveFlight();
-    }, [loadActiveFlight])
+      loadActiveFlight().then(async () => {
+        // Try to sync any pending (offline) ratings
+        const raw = await AsyncStorage.getItem("flight_ratings_v1");
+        if (!raw) return;
+        const all: Record<string, { rating: number; ratedAt: string; synced: boolean }> = JSON.parse(raw);
+        const updated = { ...all };
+        let changed = false;
+        await Promise.all(
+          Object.entries(all)
+            .filter(([, v]) => !v.synced)
+            .map(async ([key, v]) => {
+              const [fn, fd] = key.split("_");
+              try {
+                const res = await fetch(`${API_BASE}/flights/rating`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ deviceId, flightNumber: fn, flightDate: fd, rating: v.rating }),
+                });
+                if (res.ok) { updated[key] = { ...v, synced: true }; changed = true; }
+              } catch {}
+            })
+        );
+        if (changed) await AsyncStorage.setItem("flight_ratings_v1", JSON.stringify(updated));
+      });
+    }, [loadActiveFlight, deviceId])
   );
+
+  // ─── Load saved rating for active flight ─────────────────────────────────
+  const loadRating = useCallback(async (flight: RegisteredFlight) => {
+    const raw = await AsyncStorage.getItem("flight_ratings_v1");
+    if (!raw) { setFlightRating(null); return; }
+    const all = JSON.parse(raw);
+    const entry = all[`${flight.flightNumber}_${flight.flightDate}`];
+    setFlightRating(entry?.rating ?? null);
+  }, []);
+
+  const submitRating = useCallback(async (stars: number) => {
+    if (!activeFlight) return;
+    setRatingSubmitting(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const key = `${activeFlight.flightNumber}_${activeFlight.flightDate}`;
+    // Save locally first
+    const raw = await AsyncStorage.getItem("flight_ratings_v1");
+    const all = raw ? JSON.parse(raw) : {};
+    let synced = false;
+    try {
+      const res = await fetch(`${API_BASE}/flights/rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, flightNumber: activeFlight.flightNumber, flightDate: activeFlight.flightDate, rating: stars }),
+      });
+      synced = res.ok;
+    } catch {}
+    all[key] = { rating: stars, ratedAt: new Date().toISOString(), synced };
+    await AsyncStorage.setItem("flight_ratings_v1", JSON.stringify(all));
+    setFlightRating(stars);
+    setRatingSubmitting(false);
+  }, [activeFlight, deviceId]);
+
+  // Load rating when activeFlight changes
+  React.useEffect(() => {
+    if (activeFlight) loadRating(activeFlight);
+  }, [activeFlight, loadRating]);
 
   const brand = getAirlineBrand(flightInfo?.iataCode ?? activeFlight?.flightNumber?.slice(0, 2));
   const menuItems = DEMO_MENU[flightInfo?.iataCode?.toUpperCase() ?? ""] ?? GENERIC_MENU;
+
+  // Flight is landed when: status says so, actualArrival is set, or scheduledArrival is in the past
+  const isLanded = !!(
+    flightInfo?.status === "landed" ||
+    flightInfo?.actualArrival ||
+    (flightInfo?.scheduledArrival && new Date(flightInfo.scheduledArrival) < new Date()) ||
+    (activeFlight && activeFlight.flightDate < new Date().toISOString().slice(0, 10))
+  );
 
   const sections: { id: Section; label: string; icon: string }[] = [
     { id: "vlucht", label: "Vlucht", icon: "airplane-outline" },
@@ -486,6 +558,60 @@ export default function AirlineScreen() {
                 </Text>
               </View>
             )}
+
+            {/* ── Flight rating ── */}
+            <View style={[styles.ratingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.ratingHeader}>
+                <Ionicons name="star" size={16} color={isLanded ? "#f5a623" : colors.mutedForeground} />
+                <Text style={[styles.ratingTitle, { color: isLanded ? colors.foreground : colors.mutedForeground }]}>
+                  {flightRating ? "Jouw beoordeling" : "Beoordeel deze vlucht"}
+                </Text>
+              </View>
+
+              {isLanded ? (
+                flightRating ? (
+                  <View style={styles.ratingDone}>
+                    <View style={styles.ratingStars}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Ionicons key={s} name={s <= flightRating ? "star" : "star-outline"} size={28} color="#f5a623" />
+                      ))}
+                    </View>
+                    <Text style={[styles.ratingThanks, { color: colors.mutedForeground }]}>
+                      Bedankt voor je beoordeling!
+                    </Text>
+                    <Pressable onPress={() => setFlightRating(null)}>
+                      <Text style={[styles.ratingChange, { color: colors.primary }]}>Wijzigen</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.ratingStarsRow}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Pressable
+                        key={s}
+                        onPress={() => !ratingSubmitting && submitRating(s)}
+                        onPressIn={() => setHoverRating(s)}
+                        onPressOut={() => setHoverRating(null)}
+                        disabled={ratingSubmitting}
+                        style={styles.starBtn}
+                      >
+                        <Ionicons
+                          name={s <= (hoverRating ?? 0) ? "star" : "star-outline"}
+                          size={36}
+                          color={s <= (hoverRating ?? 0) ? "#f5a623" : colors.mutedForeground}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                )
+              ) : (
+                <View style={styles.ratingLocked}>
+                  <Ionicons name="lock-closed-outline" size={18} color={colors.mutedForeground} />
+                  <Text style={[styles.ratingLockedText, { color: colors.mutedForeground }]}>
+                    Je kunt de vlucht pas een beoordeling geven als het vliegtuig is geland.
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {activeFlight && (
               <Pressable
@@ -732,6 +858,19 @@ const styles = StyleSheet.create({
   infoTile: { width: "47%", borderRadius: 14, borderWidth: 1, padding: 14, gap: 4 },
   infoTileLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
   infoTileValue: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  ratingCard: {
+    borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 12, gap: 12,
+  },
+  ratingHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  ratingTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  ratingStarsRow: { flexDirection: "row", justifyContent: "center", gap: 4, paddingVertical: 4 },
+  starBtn: { padding: 4 },
+  ratingDone: { alignItems: "center", gap: 6 },
+  ratingStars: { flexDirection: "row", gap: 4 },
+  ratingThanks: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  ratingChange: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  ratingLocked: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  ratingLockedText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   chatCta: {
     flexDirection: "row", alignItems: "center", gap: 10,
     borderRadius: 14, padding: 16,

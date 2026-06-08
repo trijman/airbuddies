@@ -304,4 +304,44 @@ router.get("/flights/:flightNumber/passengers", async (req, res) => {
   });
 });
 
+// ─── In-memory rating store (pending DB migration) ────────────────────────────
+const flightRatings: Record<string, { deviceId: string; rating: number; ratedAt: string }[]> = {};
+
+const RatingBody = z.object({
+  deviceId: z.string().min(1).max(200),
+  flightNumber: z.string().min(2).max(10),
+  flightDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  rating: z.number().int().min(1).max(5),
+});
+
+// ─── POST /api/flights/rating ─────────────────────────────────────────────────
+router.post("/flights/rating", async (req, res) => {
+  const parsed = RatingBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body", details: parsed.error.issues });
+    return;
+  }
+  const { deviceId, flightNumber, flightDate, rating } = parsed.data;
+  const key = `${flightNumber}_${flightDate}`;
+  if (!flightRatings[key]) flightRatings[key] = [];
+  // Upsert: replace existing rating from same device
+  const idx = flightRatings[key].findIndex((r) => r.deviceId === deviceId);
+  const entry = { deviceId, rating, ratedAt: new Date().toISOString() };
+  if (idx >= 0) flightRatings[key][idx] = entry;
+  else flightRatings[key].push(entry);
+  const all = flightRatings[key];
+  const avg = all.reduce((s, r) => s + r.rating, 0) / all.length;
+  res.json({ success: true, totalRatings: all.length, averageRating: Math.round(avg * 10) / 10 });
+});
+
+// ─── GET /api/flights/ratings/:flightNumber ───────────────────────────────────
+router.get("/flights/ratings/:flightNumber", (req, res) => {
+  const fn = req.params.flightNumber.toUpperCase();
+  const date = req.query.date as string;
+  const key = `${fn}_${date}`;
+  const all = flightRatings[key] ?? [];
+  const avg = all.length ? all.reduce((s, r) => s + r.rating, 0) / all.length : null;
+  res.json({ flightNumber: fn, flightDate: date, totalRatings: all.length, averageRating: avg ? Math.round(avg * 10) / 10 : null });
+});
+
 export default router;
