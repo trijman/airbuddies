@@ -700,6 +700,9 @@ export default function ChatScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={[styles.seatGate, { backgroundColor: colors.background }]}
         >
+          <Pressable style={styles.seatGateBack} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={22} color={colors.foreground} />
+          </Pressable>
           <Ionicons name="airplane" size={48} color={colors.primary} style={{ marginBottom: 8 }} />
           <Text style={[styles.seatGateTitle, { color: colors.foreground }]}>Stoelnummer vereist</Text>
           <Text style={[styles.seatGateSub, { color: colors.mutedForeground }]}>
@@ -733,6 +736,9 @@ export default function ChatScreen() {
           >
             <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
             <Text style={styles.seatGateBtnText}>Deelnemen aan vluchtchat</Text>
+          </Pressable>
+          <Pressable style={styles.seatGateSkip} onPress={() => router.back()}>
+            <Text style={[styles.seatGateSkipText, { color: colors.mutedForeground }]}>Weet ik nog niet</Text>
           </Pressable>
         </RNKeyboardAvoidingView>
       )}
@@ -872,6 +878,18 @@ const styles = StyleSheet.create({
     padding: 36,
     gap: 12,
   },
+  seatGateBack: {
+    position: "absolute",
+    top: 56,
+    left: 20,
+    padding: 8,
+  },
+  seatGateSkip: {
+    marginTop: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  seatGateSkipText: { fontSize: 15, fontFamily: "Inter_400Regular" },
   seatGateTitle: { fontSize: 22, fontFamily: "Inter_700Bold", textAlign: "center" },
   seatGateSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20, marginBottom: 8 },
   seatGateInput: {
