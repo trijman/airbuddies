@@ -11,6 +11,7 @@ export interface FlightRegistrationResponse {
   deviceId: string;
   flightNumber: string;
   flightDate: string;
+  /** @nullable */
   passengerName?: string | null;
   registeredAt: string;
 }

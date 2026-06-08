@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
-import { db, flightRegistrationsTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { db, flightRegistrationsTable, flightRatingsTable } from "@workspace/db";
+import { and, eq, avg, count, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -331,44 +331,93 @@ router.get("/flights/:flightNumber/passengers", async (req, res) => {
   });
 });
 
-// ─── In-memory rating store (pending DB migration) ────────────────────────────
-const flightRatings: Record<string, { deviceId: string; rating: number; ratedAt: string }[]> = {};
-
-const RatingBody = z.object({
+const RatingInput = z.object({
   deviceId: z.string().min(1).max(200),
   flightNumber: z.string().min(2).max(10),
   flightDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  iataCode: z.string().max(3).optional(),
   rating: z.number().int().min(1).max(5),
 });
 
 // ─── POST /api/flights/rating ─────────────────────────────────────────────────
 router.post("/flights/rating", async (req, res) => {
-  const parsed = RatingBody.safeParse(req.body);
+  const parsed = RatingInput.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid body", details: parsed.error.issues });
     return;
   }
-  const { deviceId, flightNumber, flightDate, rating } = parsed.data;
-  const key = `${flightNumber}_${flightDate}`;
-  if (!flightRatings[key]) flightRatings[key] = [];
-  // Upsert: replace existing rating from same device
-  const idx = flightRatings[key].findIndex((r) => r.deviceId === deviceId);
-  const entry = { deviceId, rating, ratedAt: new Date().toISOString() };
-  if (idx >= 0) flightRatings[key][idx] = entry;
-  else flightRatings[key].push(entry);
-  const all = flightRatings[key];
-  const avg = all.reduce((s, r) => s + r.rating, 0) / all.length;
-  res.json({ success: true, totalRatings: all.length, averageRating: Math.round(avg * 10) / 10 });
+  const { deviceId, flightNumber, flightDate, iataCode, rating } = parsed.data;
+  const fn = flightNumber.toUpperCase();
+  const derivedIata = iataCode?.toUpperCase() ?? (fn.replace(/\d.*/, "").slice(0, 3) || null);
+
+  // Upsert: ON CONFLICT update rating and timestamp
+  await db
+    .insert(flightRatingsTable)
+    .values({ deviceId, flightNumber: fn, flightDate, iataCode: derivedIata, rating })
+    .onConflictDoUpdate({
+      target: [flightRatingsTable.deviceId, flightRatingsTable.flightNumber, flightRatingsTable.flightDate],
+      set: { rating, iataCode: derivedIata, ratedAt: sql`now()` },
+    });
+
+  const [agg] = await db
+    .select({ total: count(), average: avg(flightRatingsTable.rating) })
+    .from(flightRatingsTable)
+    .where(and(eq(flightRatingsTable.flightNumber, fn), eq(flightRatingsTable.flightDate, flightDate)));
+
+  const total = Number(agg?.total ?? 0);
+  const average = agg?.average ? Math.round(Number(agg.average) * 10) / 10 : null;
+  res.json({ success: true, totalRatings: total, averageRating: average });
 });
 
 // ─── GET /api/flights/ratings/:flightNumber ───────────────────────────────────
-router.get("/flights/ratings/:flightNumber", (req, res) => {
+router.get("/flights/ratings/:flightNumber", async (req, res) => {
   const fn = req.params.flightNumber.toUpperCase();
-  const date = req.query.date as string;
-  const key = `${fn}_${date}`;
-  const all = flightRatings[key] ?? [];
-  const avg = all.length ? all.reduce((s, r) => s + r.rating, 0) / all.length : null;
-  res.json({ flightNumber: fn, flightDate: date, totalRatings: all.length, averageRating: avg ? Math.round(avg * 10) / 10 : null });
+  const date = req.query.date as string | undefined;
+
+  const conditions = [eq(flightRatingsTable.flightNumber, fn)];
+  if (date) conditions.push(eq(flightRatingsTable.flightDate, date));
+
+  const [agg] = await db
+    .select({ total: count(), average: avg(flightRatingsTable.rating) })
+    .from(flightRatingsTable)
+    .where(and(...conditions));
+
+  const total = Number(agg?.total ?? 0);
+  const average = agg?.average ? Math.round(Number(agg.average) * 10) / 10 : null;
+  res.json({ flightNumber: fn, flightDate: date ?? null, totalRatings: total, averageRating: average });
+});
+
+// ─── GET /api/ratings/airline/:iataCode ───────────────────────────────────────
+router.get("/ratings/airline/:iataCode", async (req, res) => {
+  const iata = req.params.iataCode.toUpperCase();
+  const [agg] = await db
+    .select({ total: count(), average: avg(flightRatingsTable.rating) })
+    .from(flightRatingsTable)
+    .where(eq(flightRatingsTable.iataCode, iata));
+
+  const total = Number(agg?.total ?? 0);
+  const average = agg?.average ? Math.round(Number(agg.average) * 10) / 10 : null;
+  res.json({ iataCode: iata, totalRatings: total, averageRating: average });
+});
+
+// ─── GET /api/ratings/summary ─────────────────────────────────────────────────
+router.get("/ratings/summary", async (_req, res) => {
+  const rows = await db
+    .select({
+      iataCode: flightRatingsTable.iataCode,
+      total: count(),
+      average: avg(flightRatingsTable.rating),
+    })
+    .from(flightRatingsTable)
+    .groupBy(flightRatingsTable.iataCode)
+    .orderBy(sql`count(*) desc`);
+
+  const summary = rows.map((r) => ({
+    iataCode: r.iataCode,
+    totalRatings: Number(r.total),
+    averageRating: r.average ? Math.round(Number(r.average) * 10) / 10 : null,
+  }));
+  res.json({ summary, totalRatingsAllAirlines: summary.reduce((s, r) => s + r.totalRatings, 0) });
 });
 
 export default router;

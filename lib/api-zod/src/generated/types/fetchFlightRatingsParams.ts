@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetFlightPassengersParams = {
-date: string;
+export type FetchFlightRatingsParams = {
+date?: string;
 };

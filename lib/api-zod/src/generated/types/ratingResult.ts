@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UnregisterFlightResponse {
+export interface RatingResult {
   success: boolean;
+  totalRatings: number;
+  /** @nullable */
+  averageRating: number | null;
 }

@@ -20,13 +20,19 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AirlineRatingAggregate,
+  FetchFlightPassengersParams,
+  FetchFlightRatingsParams,
   FlightPassengers,
+  FlightRatingAggregate,
+  FlightRegistrationInput,
   FlightRegistrationResponse,
-  GetFlightPassengersParams,
   HealthStatus,
-  RegisterFlightRequest,
+  RatingInput,
+  RatingResult,
+  RatingsSummary,
   UnregisterFlightRequest,
-  UnregisterFlightResponse
+  UnregisterResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -129,7 +135,7 @@ export const getRegisterFlightUrl = () => {
 /**
  * @summary Register for an upcoming flight
  */
-export const registerFlight = async (registerFlightRequest: RegisterFlightRequest, options?: RequestInit): Promise<FlightRegistrationResponse> => {
+export const registerFlight = async (flightRegistrationInput: FlightRegistrationInput, options?: RequestInit): Promise<FlightRegistrationResponse> => {
 
   return customFetch<FlightRegistrationResponse>(getRegisterFlightUrl(),
   {
@@ -137,7 +143,7 @@ export const registerFlight = async (registerFlightRequest: RegisterFlightReques
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      registerFlightRequest,)
+      flightRegistrationInput,)
   }
 );}
 
@@ -145,8 +151,8 @@ export const registerFlight = async (registerFlightRequest: RegisterFlightReques
 
 
 export const getRegisterFlightMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<RegisterFlightRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<RegisterFlightRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<FlightRegistrationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<FlightRegistrationInput>}, TContext> => {
 
 const mutationKey = ['registerFlight'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -158,7 +164,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerFlight>>, {data: BodyType<RegisterFlightRequest>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerFlight>>, {data: BodyType<FlightRegistrationInput>}> = (props) => {
           const {data} = props ?? {};
 
           return  registerFlight(data,requestOptions)
@@ -172,18 +178,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RegisterFlightMutationResult = NonNullable<Awaited<ReturnType<typeof registerFlight>>>
-    export type RegisterFlightMutationBody = BodyType<RegisterFlightRequest>
+    export type RegisterFlightMutationBody = BodyType<FlightRegistrationInput>
     export type RegisterFlightMutationError = ErrorType<void>
 
     /**
  * @summary Register for an upcoming flight
  */
 export const useRegisterFlight = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<RegisterFlightRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerFlight>>, TError,{data: BodyType<FlightRegistrationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof registerFlight>>,
         TError,
-        {data: BodyType<RegisterFlightRequest>},
+        {data: BodyType<FlightRegistrationInput>},
         TContext
       > => {
       return useMutation(getRegisterFlightMutationOptions(options));
@@ -200,9 +206,9 @@ export const getUnregisterFlightUrl = () => {
 /**
  * @summary Cancel a flight registration
  */
-export const unregisterFlight = async (unregisterFlightRequest: UnregisterFlightRequest, options?: RequestInit): Promise<UnregisterFlightResponse> => {
+export const unregisterFlight = async (unregisterFlightRequest: UnregisterFlightRequest, options?: RequestInit): Promise<UnregisterResult> => {
 
-  return customFetch<UnregisterFlightResponse>(getUnregisterFlightUrl(),
+  return customFetch<UnregisterResult>(getUnregisterFlightUrl(),
   {
     ...options,
     method: 'DELETE',
@@ -260,8 +266,8 @@ export const useUnregisterFlight = <TError = ErrorType<unknown>,
       return useMutation(getUnregisterFlightMutationOptions(options));
     }
 
-export const getGetFlightPassengersUrl = (flightNumber: string,
-    params: GetFlightPassengersParams,) => {
+export const getFetchFlightPassengersUrl = (flightNumber: string,
+    params: FetchFlightPassengersParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -279,10 +285,10 @@ export const getGetFlightPassengersUrl = (flightNumber: string,
 /**
  * @summary Get passenger count for a flight on a date
  */
-export const getFlightPassengers = async (flightNumber: string,
-    params: GetFlightPassengersParams, options?: RequestInit): Promise<FlightPassengers> => {
+export const fetchFlightPassengers = async (flightNumber: string,
+    params: FetchFlightPassengersParams, options?: RequestInit): Promise<FlightPassengers> => {
 
-  return customFetch<FlightPassengers>(getGetFlightPassengersUrl(flightNumber,params),
+  return customFetch<FlightPassengers>(getFetchFlightPassengersUrl(flightNumber,params),
   {
     ...options,
     method: 'GET'
@@ -295,48 +301,362 @@ export const getFlightPassengers = async (flightNumber: string,
 
 
 
-export const getGetFlightPassengersQueryKey = (flightNumber: string,
-    params?: GetFlightPassengersParams,) => {
+export const getFetchFlightPassengersQueryKey = (flightNumber: string,
+    params?: FetchFlightPassengersParams,) => {
     return [
     `/api/flights/${flightNumber}/passengers`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetFlightPassengersQueryOptions = <TData = Awaited<ReturnType<typeof getFlightPassengers>>, TError = ErrorType<void>>(flightNumber: string,
-    params: GetFlightPassengersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFlightPassengers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getFetchFlightPassengersQueryOptions = <TData = Awaited<ReturnType<typeof fetchFlightPassengers>>, TError = ErrorType<void>>(flightNumber: string,
+    params: FetchFlightPassengersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchFlightPassengers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetFlightPassengersQueryKey(flightNumber,params);
+  const queryKey =  queryOptions?.queryKey ?? getFetchFlightPassengersQueryKey(flightNumber,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlightPassengers>>> = ({ signal }) => getFlightPassengers(flightNumber,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchFlightPassengers>>> = ({ signal }) => fetchFlightPassengers(flightNumber,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: !!(flightNumber), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlightPassengers>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(flightNumber), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof fetchFlightPassengers>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetFlightPassengersQueryResult = NonNullable<Awaited<ReturnType<typeof getFlightPassengers>>>
-export type GetFlightPassengersQueryError = ErrorType<void>
+export type FetchFlightPassengersQueryResult = NonNullable<Awaited<ReturnType<typeof fetchFlightPassengers>>>
+export type FetchFlightPassengersQueryError = ErrorType<void>
 
 
 /**
  * @summary Get passenger count for a flight on a date
  */
 
-export function useGetFlightPassengers<TData = Awaited<ReturnType<typeof getFlightPassengers>>, TError = ErrorType<void>>(
+export function useFetchFlightPassengers<TData = Awaited<ReturnType<typeof fetchFlightPassengers>>, TError = ErrorType<void>>(
  flightNumber: string,
-    params: GetFlightPassengersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFlightPassengers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    params: FetchFlightPassengersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchFlightPassengers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetFlightPassengersQueryOptions(flightNumber,params,options)
+  const queryOptions = getFetchFlightPassengersQueryOptions(flightNumber,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitRatingUrl = () => {
+
+
+
+
+  return `/api/flights/rating`
+}
+
+/**
+ * @summary Submit or update an anonymous flight rating
+ */
+export const submitRating = async (ratingInput: RatingInput, options?: RequestInit): Promise<RatingResult> => {
+
+  return customFetch<RatingResult>(getSubmitRatingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      ratingInput,)
+  }
+);}
+
+
+
+
+export const getSubmitRatingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitRating>>, TError,{data: BodyType<RatingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitRating>>, TError,{data: BodyType<RatingInput>}, TContext> => {
+
+const mutationKey = ['submitRating'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitRating>>, {data: BodyType<RatingInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitRating(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitRatingMutationResult = NonNullable<Awaited<ReturnType<typeof submitRating>>>
+    export type SubmitRatingMutationBody = BodyType<RatingInput>
+    export type SubmitRatingMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit or update an anonymous flight rating
+ */
+export const useSubmitRating = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitRating>>, TError,{data: BodyType<RatingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitRating>>,
+        TError,
+        {data: BodyType<RatingInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitRatingMutationOptions(options));
+    }
+
+export const getFetchFlightRatingsUrl = (flightNumber: string,
+    params?: FetchFlightRatingsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/flights/ratings/${flightNumber}?${stringifiedParams}` : `/api/flights/ratings/${flightNumber}`
+}
+
+/**
+ * @summary Get aggregated ratings for a specific flight
+ */
+export const fetchFlightRatings = async (flightNumber: string,
+    params?: FetchFlightRatingsParams, options?: RequestInit): Promise<FlightRatingAggregate> => {
+
+  return customFetch<FlightRatingAggregate>(getFetchFlightRatingsUrl(flightNumber,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getFetchFlightRatingsQueryKey = (flightNumber: string,
+    params?: FetchFlightRatingsParams,) => {
+    return [
+    `/api/flights/ratings/${flightNumber}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getFetchFlightRatingsQueryOptions = <TData = Awaited<ReturnType<typeof fetchFlightRatings>>, TError = ErrorType<unknown>>(flightNumber: string,
+    params?: FetchFlightRatingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchFlightRatings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFetchFlightRatingsQueryKey(flightNumber,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchFlightRatings>>> = ({ signal }) => fetchFlightRatings(flightNumber,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(flightNumber), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof fetchFlightRatings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type FetchFlightRatingsQueryResult = NonNullable<Awaited<ReturnType<typeof fetchFlightRatings>>>
+export type FetchFlightRatingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get aggregated ratings for a specific flight
+ */
+
+export function useFetchFlightRatings<TData = Awaited<ReturnType<typeof fetchFlightRatings>>, TError = ErrorType<unknown>>(
+ flightNumber: string,
+    params?: FetchFlightRatingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchFlightRatings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getFetchFlightRatingsQueryOptions(flightNumber,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAirlineRatingsUrl = (iataCode: string,) => {
+
+
+
+
+  return `/api/ratings/airline/${iataCode}`
+}
+
+/**
+ * @summary Get aggregated ratings for an airline by IATA code
+ */
+export const getAirlineRatings = async (iataCode: string, options?: RequestInit): Promise<AirlineRatingAggregate> => {
+
+  return customFetch<AirlineRatingAggregate>(getGetAirlineRatingsUrl(iataCode),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAirlineRatingsQueryKey = (iataCode: string,) => {
+    return [
+    `/api/ratings/airline/${iataCode}`
+    ] as const;
+    }
+
+
+export const getGetAirlineRatingsQueryOptions = <TData = Awaited<ReturnType<typeof getAirlineRatings>>, TError = ErrorType<unknown>>(iataCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAirlineRatings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAirlineRatingsQueryKey(iataCode);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAirlineRatings>>> = ({ signal }) => getAirlineRatings(iataCode, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(iataCode), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAirlineRatings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAirlineRatingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAirlineRatings>>>
+export type GetAirlineRatingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get aggregated ratings for an airline by IATA code
+ */
+
+export function useGetAirlineRatings<TData = Awaited<ReturnType<typeof getAirlineRatings>>, TError = ErrorType<unknown>>(
+ iataCode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAirlineRatings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAirlineRatingsQueryOptions(iataCode,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRatingsSummaryUrl = () => {
+
+
+
+
+  return `/api/ratings/summary`
+}
+
+/**
+ * @summary Get rating summary for all airlines
+ */
+export const getRatingsSummary = async ( options?: RequestInit): Promise<RatingsSummary> => {
+
+  return customFetch<RatingsSummary>(getGetRatingsSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRatingsSummaryQueryKey = () => {
+    return [
+    `/api/ratings/summary`
+    ] as const;
+    }
+
+
+export const getGetRatingsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getRatingsSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRatingsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRatingsSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRatingsSummary>>> = ({ signal }) => getRatingsSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRatingsSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRatingsSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getRatingsSummary>>>
+export type GetRatingsSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get rating summary for all airlines
+ */
+
+export function useGetRatingsSummary<TData = Awaited<ReturnType<typeof getRatingsSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRatingsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRatingsSummaryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -6,10 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './airlineRatingAggregate';
+export * from './airlineRatingSummaryItem';
+export * from './fetchFlightPassengersParams';
+export * from './fetchFlightRatingsParams';
 export * from './flightPassengers';
+export * from './flightRatingAggregate';
+export * from './flightRegistrationInput';
 export * from './flightRegistrationResponse';
-export * from './getFlightPassengersParams';
 export * from './healthStatus';
-export * from './registerFlightRequest';
+export * from './ratingInput';
+export * from './ratingResult';
+export * from './ratingsSummary';
 export * from './unregisterFlightRequest';
-export * from './unregisterFlightResponse';
+export * from './unregisterResult';

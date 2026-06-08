@@ -44,19 +44,87 @@ export const UnregisterFlightResponse = zod.object({
 /**
  * @summary Get passenger count for a flight on a date
  */
-export const GetFlightPassengersParams = zod.object({
+export const FetchFlightPassengersParams = zod.object({
   "flightNumber": zod.coerce.string()
 })
 
-export const GetFlightPassengersQueryParams = zod.object({
+export const FetchFlightPassengersQueryParams = zod.object({
   "date": zod.coerce.string()
 })
 
-export const GetFlightPassengersResponse = zod.object({
+export const FetchFlightPassengersResponse = zod.object({
   "flightNumber": zod.string(),
   "flightDate": zod.string(),
   "count": zod.number(),
   "names": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Submit or update an anonymous flight rating
+ */
+export const submitRatingBodyRatingMax = 5;
+
+
+
+export const SubmitRatingBody = zod.object({
+  "deviceId": zod.string(),
+  "flightNumber": zod.string(),
+  "flightDate": zod.string(),
+  "iataCode": zod.string().optional(),
+  "rating": zod.number().min(1).max(submitRatingBodyRatingMax)
+})
+
+export const SubmitRatingResponse = zod.object({
+  "success": zod.boolean(),
+  "totalRatings": zod.number(),
+  "averageRating": zod.number().nullable()
+})
+
+
+/**
+ * @summary Get aggregated ratings for a specific flight
+ */
+export const FetchFlightRatingsParams = zod.object({
+  "flightNumber": zod.coerce.string()
+})
+
+export const FetchFlightRatingsQueryParams = zod.object({
+  "date": zod.coerce.string().optional()
+})
+
+export const FetchFlightRatingsResponse = zod.object({
+  "flightNumber": zod.string(),
+  "flightDate": zod.string().nullable(),
+  "totalRatings": zod.number(),
+  "averageRating": zod.number().nullable()
+})
+
+
+/**
+ * @summary Get aggregated ratings for an airline by IATA code
+ */
+export const GetAirlineRatingsParams = zod.object({
+  "iataCode": zod.coerce.string()
+})
+
+export const GetAirlineRatingsResponse = zod.object({
+  "iataCode": zod.string(),
+  "totalRatings": zod.number(),
+  "averageRating": zod.number().nullable()
+})
+
+
+/**
+ * @summary Get rating summary for all airlines
+ */
+export const GetRatingsSummaryResponse = zod.object({
+  "summary": zod.array(zod.object({
+  "iataCode": zod.string().nullable(),
+  "totalRatings": zod.number(),
+  "averageRating": zod.number().nullable()
+})),
+  "totalRatingsAllAirlines": zod.number()
 })
 
 

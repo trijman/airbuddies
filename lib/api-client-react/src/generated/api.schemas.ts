@@ -9,7 +9,7 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface RegisterFlightRequest {
+export interface FlightRegistrationInput {
   deviceId: string;
   flightNumber: string;
   flightDate: string;
@@ -21,6 +21,7 @@ export interface FlightRegistrationResponse {
   deviceId: string;
   flightNumber: string;
   flightDate: string;
+  /** @nullable */
   passengerName?: string | null;
   registeredAt: string;
 }
@@ -31,7 +32,7 @@ export interface UnregisterFlightRequest {
   flightDate: string;
 }
 
-export interface UnregisterFlightResponse {
+export interface UnregisterResult {
   success: boolean;
 }
 
@@ -42,7 +43,59 @@ export interface FlightPassengers {
   names: string[];
 }
 
-export type GetFlightPassengersParams = {
+export interface RatingInput {
+  deviceId: string;
+  flightNumber: string;
+  flightDate: string;
+  iataCode?: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+}
+
+export interface RatingResult {
+  success: boolean;
+  totalRatings: number;
+  /** @nullable */
+  averageRating: number | null;
+}
+
+export interface FlightRatingAggregate {
+  flightNumber: string;
+  /** @nullable */
+  flightDate: string | null;
+  totalRatings: number;
+  /** @nullable */
+  averageRating: number | null;
+}
+
+export interface AirlineRatingAggregate {
+  iataCode: string;
+  totalRatings: number;
+  /** @nullable */
+  averageRating: number | null;
+}
+
+export interface AirlineRatingSummaryItem {
+  /** @nullable */
+  iataCode: string | null;
+  totalRatings: number;
+  /** @nullable */
+  averageRating: number | null;
+}
+
+export interface RatingsSummary {
+  summary: AirlineRatingSummaryItem[];
+  totalRatingsAllAirlines: number;
+}
+
+export type FetchFlightPassengersParams = {
 date: string;
+};
+
+export type FetchFlightRatingsParams = {
+date?: string;
 };
 

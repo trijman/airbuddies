@@ -6,9 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RegisterFlightRequest {
+export interface RatingInput {
   deviceId: string;
   flightNumber: string;
   flightDate: string;
-  passengerName?: string;
+  iataCode?: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
 }

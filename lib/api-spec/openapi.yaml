@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: flights
     description: Pre-flight registration
+  - name: ratings
+    description: Anonymous flight ratings
 paths:
   /healthz:
     get:
@@ -36,7 +38,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterFlightRequest"
+              $ref: "#/components/schemas/FlightRegistrationInput"
       responses:
         "201":
           description: Registration created
@@ -64,11 +66,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UnregisterFlightResponse"
+                $ref: "#/components/schemas/UnregisterResult"
 
   /flights/{flightNumber}/passengers:
     get:
-      operationId: getFlightPassengers
+      operationId: fetchFlightPassengers
       tags: [flights]
       summary: Get passenger count for a flight on a date
       parameters:
@@ -92,6 +94,83 @@ paths:
         "400":
           description: Bad request
 
+  /flights/rating:
+    post:
+      operationId: submitRating
+      tags: [ratings]
+      summary: Submit or update an anonymous flight rating
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingInput"
+      responses:
+        "200":
+          description: Rating saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingResult"
+        "400":
+          description: Bad request
+
+  /flights/ratings/{flightNumber}:
+    get:
+      operationId: fetchFlightRatings
+      tags: [ratings]
+      summary: Get aggregated ratings for a specific flight
+      parameters:
+        - name: flightNumber
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rating aggregate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightRatingAggregate"
+
+  /ratings/airline/{iataCode}:
+    get:
+      operationId: getAirlineRatings
+      tags: [ratings]
+      summary: Get aggregated ratings for an airline by IATA code
+      parameters:
+        - name: iataCode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Airline rating aggregate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AirlineRatingAggregate"
+
+  /ratings/summary:
+    get:
+      operationId: getRatingsSummary
+      tags: [ratings]
+      summary: Get rating summary for all airlines
+      responses:
+        "200":
+          description: Ratings summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingsSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -102,7 +181,7 @@ components:
       required:
         - status
 
-    RegisterFlightRequest:
+    FlightRegistrationInput:
       type: object
       properties:
         deviceId:
@@ -130,8 +209,7 @@ components:
         flightDate:
           type: string
         passengerName:
-          type: string
-          nullable: true
+          type: ["string", "null"]
         registeredAt:
           type: string
       required:
@@ -155,7 +233,7 @@ components:
         - flightNumber
         - flightDate
 
-    UnregisterFlightResponse:
+    UnregisterResult:
       type: object
       properties:
         success:
@@ -181,3 +259,96 @@ components:
         - flightDate
         - count
         - names
+
+    RatingInput:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        flightNumber:
+          type: string
+        flightDate:
+          type: string
+        iataCode:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required:
+        - deviceId
+        - flightNumber
+        - flightDate
+        - rating
+
+    RatingResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        totalRatings:
+          type: integer
+        averageRating:
+          type: ["number", "null"]
+      required:
+        - success
+        - totalRatings
+        - averageRating
+
+    FlightRatingAggregate:
+      type: object
+      properties:
+        flightNumber:
+          type: string
+        flightDate:
+          type: ["string", "null"]
+        totalRatings:
+          type: integer
+        averageRating:
+          type: ["number", "null"]
+      required:
+        - flightNumber
+        - flightDate
+        - totalRatings
+        - averageRating
+
+    AirlineRatingAggregate:
+      type: object
+      properties:
+        iataCode:
+          type: string
+        totalRatings:
+          type: integer
+        averageRating:
+          type: ["number", "null"]
+      required:
+        - iataCode
+        - totalRatings
+        - averageRating
+
+    AirlineRatingSummaryItem:
+      type: object
+      properties:
+        iataCode:
+          type: ["string", "null"]
+        totalRatings:
+          type: integer
+        averageRating:
+          type: ["number", "null"]
+      required:
+        - iataCode
+        - totalRatings
+        - averageRating
+
+    RatingsSummary:
+      type: object
+      properties:
+        summary:
+          type: array
+          items:
+            $ref: "#/components/schemas/AirlineRatingSummaryItem"
+        totalRatingsAllAirlines:
+          type: integer
+      required:
+        - summary
+        - totalRatingsAllAirlines
