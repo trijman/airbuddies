@@ -149,6 +149,8 @@ interface AppContextType {
   activeAirlineIata: string | null;
   setActiveAirlineIata: (iata: string | null) => void;
   activeAircraftType: string | null;
+  activeSeatNumber: string | null;
+  setActiveSeatNumber: (seat: string | null) => void;
   deleteConversationsByFlightNumber: (flightNumber: string) => void;
   deleteAllConversations: () => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
@@ -271,6 +273,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [activeAirlineIata, setActiveAirlineIata] = useState<string | null>(null);
   const [activeAircraftType, setActiveAircraftType] = useState<string | null>(null);
+  const [activeSeatNumber, setActiveSeatNumber] = useState<string | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -319,6 +322,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const iata = active.flightInfo?.iataCode ?? active.flightNumber.slice(0, 2).toUpperCase();
             setActiveAirlineIata(iata);
             setActiveAircraftType(active.flightInfo?.aircraftType ?? null);
+            setActiveSeatNumber(active.seatNumber ?? null);
           }
         }
       } catch { /* ignore */ }
@@ -908,6 +912,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeAirlineIata,
         setActiveAirlineIata,
         activeAircraftType,
+        activeSeatNumber,
+        setActiveSeatNumber,
         deleteConversationsByFlightNumber,
         deleteAllConversations,
         deleteMessage,

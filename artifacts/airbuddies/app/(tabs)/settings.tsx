@@ -82,7 +82,7 @@ function SettingRow({ icon, iconColor, label, value, onPress, danger, right }: S
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, toggleVisibility, deleteAllConversations, updateProfile } = useApp();
+  const { profile, toggleVisibility, deleteAllConversations, setActiveSeatNumber } = useApp();
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
 
@@ -184,7 +184,7 @@ export default function SettingsScreen() {
     );
     await AsyncStorage.setItem("my_flights_v1", JSON.stringify(updated));
     setFlights(updated);
-    updateProfile({ seatNumber: seat || undefined });
+    setActiveSeatNumber(seat || null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setEditingKey(null);
     setEditValue("");

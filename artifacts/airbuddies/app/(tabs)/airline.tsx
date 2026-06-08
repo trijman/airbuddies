@@ -199,7 +199,7 @@ const GAMES = [
 export default function AirlineScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { conversations, profile, createGroup } = useApp();
+  const { conversations, profile, createGroup, activeSeatNumber } = useApp();
   const deviceId = profile?.id ?? "me_static_001";
   const [activeSection, setActiveSection] = useState<Section>("vlucht");
   const [orderItems, setOrderItems] = useState<string[]>([]);
@@ -537,7 +537,7 @@ export default function AirlineScreen() {
                 { label: "Terminal", value: flightInfo?.terminal ?? "–", icon: "business-outline" },
                 { label: "Status", value: flightInfo?.status === "landed" ? "Geland" : flightInfo?.status === "active" ? "Onderweg" : "Gepland", icon: "radio-outline" },
                 { label: "Vertraging", value: (flightInfo?.delayMinutes ?? 0) > 0 ? `+${flightInfo?.delayMinutes} min` : "Geen", icon: "time-outline" },
-                { label: "Jouw stoel", value: profile?.seatNumber ?? "–", icon: "person-outline" },
+                { label: "Jouw stoel", value: activeSeatNumber ?? "–", icon: "person-outline" },
               ].map((item) => (
                 <View
                   key={item.label}
