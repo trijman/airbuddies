@@ -143,7 +143,7 @@ interface AppContextType {
   markAsRead: (conversationId: string) => void;
   clearChatHistory: (conversationId: string) => void;
   deleteConversation: (conversationId: string) => void;
-  transferAdmin: (conversationId: string, newAdminId: string) => void;
+  transferAdmin: (conversationId: string, newAdminId: string, newAdminName?: string) => void;
   inviteToGroup: (conversationId: string, buddyIds: string[]) => void;
   muteConversation: (conversationId: string, muted: boolean) => void;
   leaveGroup: (conversationId: string) => void;
@@ -766,12 +766,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const transferAdmin = useCallback((conversationId: string, newAdminId: string) => {
+  const transferAdmin = useCallback((conversationId: string, newAdminId: string, newAdminName?: string) => {
     setConversations((prev) => {
       const updated = prev.map((c) =>
         c.id === conversationId ? { ...c, adminId: newAdminId } : c
       );
       saveConversations(updated);
+      return updated;
+    });
+    const label = newAdminName ?? "Nieuwe deelnemer";
+    const sysMsg: Message = {
+      id: `sys_${Date.now()}`,
+      conversationId,
+      senderId: "system",
+      type: "system",
+      content: `${label} is de nieuwe beheerder van dit gesprek.`,
+      timestamp: Date.now(),
+      status: "read",
+    };
+    setMessages((prev) => {
+      const updated = {
+        ...prev,
+        [conversationId]: [...(prev[conversationId] ?? []), sysMsg],
+      };
+      saveMessages(updated);
       return updated;
     });
   }, []);

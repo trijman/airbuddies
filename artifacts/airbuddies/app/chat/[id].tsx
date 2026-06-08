@@ -812,7 +812,7 @@ export default function ChatScreen() {
                               text: "Overdragen & verwijderen",
                               style: "destructive",
                               onPress: () => {
-                                transferAdmin(id ?? "", pid);
+                                transferAdmin(id ?? "", pid, name);
                                 deleteConversation(id ?? "");
                                 router.back();
                               },
