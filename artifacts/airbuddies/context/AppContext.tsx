@@ -155,6 +155,7 @@ interface AppContextType {
   activeAircraftType: string | null;
   activeSeatNumber: string | null;
   setActiveSeatNumber: (seat: string | null) => void;
+  refreshActiveFlight: () => Promise<void>;
   deleteConversationsByFlightNumber: (flightNumber: string) => void;
   deleteAllConversations: () => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
@@ -867,6 +868,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [messages]);
 
+  const refreshActiveFlight = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem("my_flights_v1");
+      if (!stored) return;
+      const flights: Array<{ flightNumber: string; flightDate: string; seatNumber?: string; flightInfo?: { iataCode?: string; scheduledDeparture?: string | null; aircraftType?: string | null } }> = JSON.parse(stored);
+      const now = new Date();
+      const sorted = [...flights].sort((a, b) => {
+        const aT = a.flightInfo?.scheduledDeparture ?? `${a.flightDate}T23:59:59`;
+        const bT = b.flightInfo?.scheduledDeparture ?? `${b.flightDate}T23:59:59`;
+        return aT.localeCompare(bT);
+      });
+      const active = sorted.find((f) => new Date(f.flightInfo?.scheduledDeparture ?? `${f.flightDate}T23:59:59`) > now)
+        ?? sorted[sorted.length - 1];
+      if (active) {
+        const iata = active.flightInfo?.iataCode ?? active.flightNumber.slice(0, 2).toUpperCase();
+        setActiveAirlineIata(iata);
+        setActiveAircraftType(active.flightInfo?.aircraftType ?? null);
+        setActiveSeatNumber(active.seatNumber ?? null);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const deleteConversationsByFlightNumber = useCallback((flightNumber: string) => {
     setConversations((prev) => {
       const toDelete = new Set(prev.filter((c) => c.flightNumber === flightNumber).map((c) => c.id));
@@ -962,6 +985,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeAircraftType,
         activeSeatNumber,
         setActiveSeatNumber,
+        refreshActiveFlight,
         deleteConversationsByFlightNumber,
         deleteAllConversations,
         deleteMessage,

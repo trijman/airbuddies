@@ -31,6 +31,10 @@ import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import type { Message, MediaAttachment } from "@/context/AppContext";
 
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
+  : "http://localhost:80/api";
+
 function StatusIcon({ status }: { status: Message["status"] }) {
   const colors = useColors();
   if (status === "sending") return <Ionicons name="time-outline" size={12} color={colors.mutedForeground} />;
@@ -287,7 +291,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, transferAdmin, muteConversation, leaveGroup, deleteMessage } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, transferAdmin, muteConversation, leaveGroup, deleteMessage, refreshActiveFlight } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -319,14 +323,38 @@ export default function ChatScreen() {
     if (!gateInput.trim() || !conv?.flightNumber) return;
     setSavingGate(true);
     try {
+      const seat = gateInput.trim().toUpperCase();
       const stored = await AsyncStorage.getItem("my_flights_v1");
-      if (stored) {
-        const flights = JSON.parse(stored);
-        const updated = flights.map((f: { flightNumber: string }) =>
-          f.flightNumber === conv.flightNumber ? { ...f, seatNumber: gateInput.trim().toUpperCase() } : f
-        );
-        await AsyncStorage.setItem("my_flights_v1", JSON.stringify(updated));
+      const flights: Array<{ flightNumber: string; flightDate: string; seatNumber?: string; flightInfo?: object }> =
+        stored ? JSON.parse(stored) : [];
+
+      const existingIdx = flights.findIndex((f) => f.flightNumber === conv.flightNumber);
+
+      if (existingIdx >= 0) {
+        // Already registered — just update seat number
+        flights[existingIdx] = { ...flights[existingIdx], seatNumber: seat };
+      } else {
+        // Not registered yet — add the flight and fetch its info from the API
+        const today = new Date().toISOString().slice(0, 10);
+        const newEntry: { flightNumber: string; flightDate: string; seatNumber: string; flightInfo?: object } = {
+          flightNumber: conv.flightNumber,
+          flightDate: today,
+          seatNumber: seat,
+        };
+        try {
+          const res = await fetch(
+            `${API_BASE}/flights/search?flight=${encodeURIComponent(conv.flightNumber)}&date=${today}`
+          );
+          if (res.ok) {
+            const info = await res.json();
+            newEntry.flightInfo = info;
+          }
+        } catch { /* use minimal entry without flightInfo */ }
+        flights.push(newEntry);
       }
+
+      await AsyncStorage.setItem("my_flights_v1", JSON.stringify(flights));
+      await refreshActiveFlight();
       setGateInput("");
       setSeatGate(false);
     } finally {
