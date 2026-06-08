@@ -18,7 +18,6 @@ import {
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
@@ -636,9 +635,9 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <RNKeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior="padding"
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
       <View
@@ -1009,7 +1008,7 @@ export default function ChatScreen() {
           </Pressable>
         </RNKeyboardAvoidingView>
       )}
-    </KeyboardAvoidingView>
+    </RNKeyboardAvoidingView>
   );
 }
 
