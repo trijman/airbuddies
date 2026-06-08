@@ -13,7 +13,7 @@
     },
     "preview": {
       "distribution": "internal",
-      "pnpm": "9",
+      "pnpm": "9.15.9",
       "ios": {
         "buildConfiguration": "Release",
         "image": "latest"
