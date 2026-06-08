@@ -8,6 +8,7 @@ export const flightRegistrationsTable = pgTable("flight_registrations", {
   flightNumber: text("flight_number").notNull(),
   flightDate: date("flight_date", { mode: "string" }).notNull(),
   passengerName: text("passenger_name"),
+  seatNumber: text("seat_number"),
   registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

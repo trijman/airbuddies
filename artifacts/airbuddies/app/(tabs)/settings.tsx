@@ -22,6 +22,12 @@ import { InterestChip } from "@/components/InterestChip";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
+  : "/api";
+
+const SEAT_RE = /^([1-9]|[1-5][0-9]|60)[A-K]$/i;
+
 interface RegisteredFlight {
   flightNumber: string;
   flightDate: string;
@@ -83,6 +89,8 @@ export default function SettingsScreen() {
   const [flights, setFlights] = useState<RegisteredFlight[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [seatError, setSeatError] = useState<string | null>(null);
+  const [seatChecking, setSeatChecking] = useState(false);
 
   // Auto-cleanup setting: { enabled, hours: 0=direct,1,4,10 }
   const [autoClean, setAutoClean] = useState(false);
@@ -132,21 +140,50 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEditingKey(flightKey(f));
     setEditValue(f.seatNumber ?? "");
+    setSeatError(null);
   };
 
   const cancelEdit = () => {
     setEditingKey(null);
     setEditValue("");
+    setSeatError(null);
   };
 
   const saveEdit = async (f: RegisteredFlight) => {
     const seat = editValue.trim().toUpperCase();
+
+    if (seat && !SEAT_RE.test(seat)) {
+      setSeatError("Ongeldig stoelnummer (bijv. 14A, max. rij 60)");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    if (seat) {
+      setSeatChecking(true);
+      try {
+        const deviceId = profile?.id ?? "me_static_001";
+        const res = await fetch(
+          `${API_BASE}/flights/${encodeURIComponent(f.flightNumber)}/seat-check?date=${f.flightDate}&seat=${encodeURIComponent(seat)}&deviceId=${encodeURIComponent(deviceId)}`
+        );
+        if (res.ok) {
+          const data: { taken: boolean } = await res.json();
+          if (data.taken) {
+            setSeatError("Dit stoelnummer is al aangemeld op deze vlucht");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            setSeatChecking(false);
+            return;
+          }
+        }
+      } catch { /* network error — proceed anyway */ }
+      setSeatChecking(false);
+    }
+
+    setSeatError(null);
     const updated = flights.map((fl) =>
       flightKey(fl) === flightKey(f) ? { ...fl, seatNumber: seat || undefined } : fl
     );
     await AsyncStorage.setItem("my_flights_v1", JSON.stringify(updated));
     setFlights(updated);
-    // Sync to profile so airline tab and seat map stay consistent
     updateProfile({ seatNumber: seat || undefined });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setEditingKey(null);
@@ -256,29 +293,43 @@ export default function SettingsScreen() {
                     )}
                   </Pressable>
                   {isEditing && (
-                    <View style={[styles.seatEditRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                      <TextInput
-                        style={[styles.seatEditInput, { color: colors.foreground, borderColor: colors.primary, backgroundColor: colors.card }]}
-                        value={editValue}
-                        onChangeText={(t) => setEditValue(t.toUpperCase())}
-                        placeholder="bijv. 14A"
-                        placeholderTextColor={colors.mutedForeground}
-                        autoCapitalize="characters"
-                        maxLength={5}
-                        autoFocus
-                        returnKeyType="done"
-                        onSubmitEditing={() => saveEdit(f)}
-                      />
-                      <Pressable
-                        style={[styles.seatEditBtn, { backgroundColor: colors.primary, opacity: editValue.trim() ? 1 : 0.4 }]}
-                        onPress={() => saveEdit(f)}
-                        disabled={!editValue.trim()}
-                      >
-                        <Ionicons name="checkmark" size={18} color="#fff" />
-                      </Pressable>
-                      <Pressable style={[styles.seatEditBtn, { backgroundColor: colors.muted }]} onPress={cancelEdit}>
-                        <Ionicons name="close" size={18} color={colors.mutedForeground} />
-                      </Pressable>
+                    <View style={{ backgroundColor: colors.background, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+                      <View style={styles.seatEditRow}>
+                        <TextInput
+                          style={[
+                            styles.seatEditInput,
+                            {
+                              color: colors.foreground,
+                              borderColor: seatError ? colors.destructive : colors.primary,
+                              backgroundColor: colors.card,
+                            },
+                          ]}
+                          value={editValue}
+                          onChangeText={(t) => { setEditValue(t.toUpperCase()); setSeatError(null); }}
+                          placeholder="bijv. 14A"
+                          placeholderTextColor={colors.mutedForeground}
+                          autoCapitalize="characters"
+                          maxLength={5}
+                          autoFocus
+                          returnKeyType="done"
+                          onSubmitEditing={() => saveEdit(f)}
+                        />
+                        <Pressable
+                          style={[styles.seatEditBtn, { backgroundColor: colors.primary, opacity: editValue.trim() && !seatChecking ? 1 : 0.4 }]}
+                          onPress={() => saveEdit(f)}
+                          disabled={!editValue.trim() || seatChecking}
+                        >
+                          <Ionicons name={seatChecking ? "time-outline" : "checkmark"} size={18} color="#fff" />
+                        </Pressable>
+                        <Pressable style={[styles.seatEditBtn, { backgroundColor: colors.muted }]} onPress={cancelEdit}>
+                          <Ionicons name="close" size={18} color={colors.mutedForeground} />
+                        </Pressable>
+                      </View>
+                      {seatError && (
+                        <Text style={{ color: colors.destructive, fontSize: 12, fontFamily: "Inter_400Regular", paddingHorizontal: 14, paddingBottom: 8 }}>
+                          {seatError}
+                        </Text>
+                      )}
                     </View>
                   )}
                 </View>

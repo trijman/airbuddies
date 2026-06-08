@@ -252,6 +252,8 @@ export default function MyFlightsScreen() {
   const [seatModalVisible, setSeatModalVisible] = useState(false);
   const [pendingSeatFlight, setPendingSeatFlight] = useState<RegisteredFlight | null>(null);
   const [seatInput, setSeatInput] = useState("");
+  const [seatError, setSeatError] = useState<string | null>(null);
+  const [seatChecking, setSeatChecking] = useState(false);
   const [pendingCount, setPendingCount] = useState<{ count: number; flightNumber: string } | null>(null);
   const isWeb = Platform.OS === "web";
 
@@ -511,9 +513,35 @@ export default function MyFlightsScreen() {
 
   const handleConfirmSeat = async () => {
     if (!pendingSeatFlight || !seatInput.trim()) return;
+    const seat = seatInput.trim().toUpperCase();
+    const SEAT_RE = /^([1-9]|[1-5][0-9]|60)[A-K]$/i;
+
+    if (!SEAT_RE.test(seat)) {
+      setSeatError("Ongeldig stoelnummer (bijv. 14A, max. rij 60)");
+      return;
+    }
+
+    setSeatChecking(true);
+    try {
+      const deviceId = profile?.id ?? "me_static_001";
+      const res = await fetch(
+        `${API_BASE}/flights/${encodeURIComponent(pendingSeatFlight.flightNumber)}/seat-check?date=${pendingSeatFlight.flightDate}&seat=${encodeURIComponent(seat)}&deviceId=${encodeURIComponent(deviceId)}`
+      );
+      if (res.ok) {
+        const data: { taken: boolean } = await res.json();
+        if (data.taken) {
+          setSeatError("Dit stoelnummer is al aangemeld op deze vlucht");
+          setSeatChecking(false);
+          return;
+        }
+      }
+    } catch { /* network error — proceed */ }
+    setSeatChecking(false);
+    setSeatError(null);
+
     const updated = registeredFlights.map((f) =>
       f.flightNumber === pendingSeatFlight.flightNumber && f.flightDate === pendingSeatFlight.flightDate
-        ? { ...f, seatNumber: seatInput.trim().toUpperCase() }
+        ? { ...f, seatNumber: seat }
         : f
     );
     await saveRegisteredFlights(updated);
@@ -786,22 +814,27 @@ export default function MyFlightsScreen() {
                   Vlucht {pendingSeatFlight?.flightNumber} · zichtbaar in de vluchtchat
                 </Text>
                 <TextInput
-                  style={[styles.seatInput, { color: colors.foreground, borderColor: seatInput ? colors.primary : colors.border, backgroundColor: colors.background }]}
+                  style={[styles.seatInput, { color: colors.foreground, borderColor: seatError ? colors.destructive : seatInput ? colors.primary : colors.border, backgroundColor: colors.background }]}
                   placeholder="bijv. 14A"
                   placeholderTextColor={colors.mutedForeground}
                   value={seatInput}
-                  onChangeText={(t) => setSeatInput(t.toUpperCase())}
+                  onChangeText={(t) => { setSeatInput(t.toUpperCase()); setSeatError(null); }}
                   autoCapitalize="characters"
                   maxLength={5}
                   returnKeyType="done"
                   onSubmitEditing={handleConfirmSeat}
                 />
+                {seatError && (
+                  <Text style={{ color: colors.destructive, fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4, marginBottom: 4 }}>
+                    {seatError}
+                  </Text>
+                )}
                 <Pressable
-                  style={[styles.seatConfirmBtn, { backgroundColor: colors.primary, opacity: seatInput.trim() ? 1 : 0.45 }]}
+                  style={[styles.seatConfirmBtn, { backgroundColor: colors.primary, opacity: seatInput.trim() && !seatChecking ? 1 : 0.45 }]}
                   onPress={handleConfirmSeat}
-                  disabled={!seatInput.trim()}
+                  disabled={!seatInput.trim() || seatChecking}
                 >
-                  <Text style={styles.seatConfirmText}>Bevestig stoelnummer</Text>
+                  <Text style={styles.seatConfirmText}>{seatChecking ? "Controleren…" : "Bevestig stoelnummer"}</Text>
                 </Pressable>
                 <Pressable onPress={handleSkipSeat} style={styles.seatSkipBtn}>
                   <Text style={[styles.seatSkipText, { color: colors.mutedForeground }]}>Weet ik nog niet</Text>

@@ -10,6 +10,7 @@ const RegisterBody = z.object({
   flightNumber: z.string().min(2).max(10),
   flightDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   passengerName: z.string().max(100).optional(),
+  seatNumber: z.string().max(6).regex(/^([1-9]|[1-5][0-9]|60)[A-K]$/i).optional(),
 });
 
 const UnregisterBody = z.object({
@@ -228,8 +229,9 @@ router.post("/flights/register", async (req, res) => {
     return;
   }
 
-  const { deviceId, flightNumber, flightDate, passengerName } = parsed.data;
+  const { deviceId, flightNumber, flightDate, passengerName, seatNumber } = parsed.data;
   const fn = flightNumber.toUpperCase();
+  const seat = seatNumber?.toUpperCase() ?? null;
 
   await db
     .delete(flightRegistrationsTable)
@@ -243,7 +245,7 @@ router.post("/flights/register", async (req, res) => {
 
   const [registration] = await db
     .insert(flightRegistrationsTable)
-    .values({ deviceId, flightNumber: fn, flightDate, passengerName })
+    .values({ deviceId, flightNumber: fn, flightDate, passengerName, seatNumber: seat })
     .returning();
 
   res.status(201).json(registration);
@@ -269,6 +271,31 @@ router.delete("/flights/unregister", async (req, res) => {
     );
 
   res.json({ success: true });
+});
+
+// ─── GET /api/flights/:flightNumber/seat-check ────────────────────────────────
+router.get("/flights/:flightNumber/seat-check", async (req, res) => {
+  const flightNumber = req.params.flightNumber.toUpperCase();
+  const { date, seat, deviceId } = req.query as { date?: string; seat?: string; deviceId?: string };
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !seat || !deviceId) {
+    res.status(400).json({ error: "Missing or invalid date, seat, or deviceId" });
+    return;
+  }
+
+  const rows = await db
+    .select()
+    .from(flightRegistrationsTable)
+    .where(
+      and(
+        eq(flightRegistrationsTable.flightNumber, flightNumber),
+        eq(flightRegistrationsTable.flightDate, date),
+        eq(flightRegistrationsTable.seatNumber, seat.toUpperCase())
+      )
+    );
+
+  const taken = rows.some((r) => r.deviceId !== deviceId);
+  res.json({ taken });
 });
 
 // ─── GET /api/flights/:flightNumber/passengers ────────────────────────────────
