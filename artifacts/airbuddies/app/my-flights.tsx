@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Platform,
   Pressable,
   RefreshControl,
@@ -409,6 +410,7 @@ export default function MyFlightsScreen() {
       setPassengerCounts((prev) => ({ ...prev, [key]: count }));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Keyboard.dismiss();
       setFlightNumber("");
       setSearchResult(null);
 

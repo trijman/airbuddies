@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -235,9 +235,11 @@ export default function AirlineScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadActiveFlight();
-  }, [loadActiveFlight]);
+  useFocusEffect(
+    useCallback(() => {
+      loadActiveFlight();
+    }, [loadActiveFlight])
+  );
 
   const brand = getAirlineBrand(flightInfo?.iataCode ?? activeFlight?.flightNumber?.slice(0, 2));
   const menuItems = DEMO_MENU[flightInfo?.iataCode?.toUpperCase() ?? ""] ?? GENERIC_MENU;
