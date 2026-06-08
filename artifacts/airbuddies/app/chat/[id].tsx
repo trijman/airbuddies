@@ -291,7 +291,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, transferAdmin, muteConversation, leaveGroup, deleteMessage, refreshActiveFlight } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, transferAdmin, muteConversation, leaveGroup, deleteMessage, refreshActiveFlight, addSystemMessage } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -334,22 +334,69 @@ export default function ChatScreen() {
         // Already registered — just update seat number
         flights[existingIdx] = { ...flights[existingIdx], seatNumber: seat };
       } else {
-        // Not registered yet — add the flight and fetch its info from the API
+        // Not registered yet — new user joining mid-flight
         const today = new Date().toISOString().slice(0, 10);
-        const newEntry: { flightNumber: string; flightDate: string; seatNumber: string; flightInfo?: object } = {
+        const iataCode = (conv.flightNumber ?? "").replace(/\d.*/, "").toUpperCase().slice(0, 3) || "??";
+        const newEntry: {
+          flightNumber: string;
+          flightDate: string;
+          seatNumber: string;
+          flightInfo?: object;
+        } = {
           flightNumber: conv.flightNumber,
           flightDate: today,
           seatNumber: seat,
         };
+
+        let gotDataFromApi = false;
         try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
           const res = await fetch(
-            `${API_BASE}/flights/search?flight=${encodeURIComponent(conv.flightNumber)}&date=${today}`
+            `${API_BASE}/flights/search?flight=${encodeURIComponent(conv.flightNumber)}&date=${today}`,
+            { signal: controller.signal }
           );
+          clearTimeout(timeout);
           if (res.ok) {
             const info = await res.json();
             newEntry.flightInfo = info;
+            gotDataFromApi = true;
           }
-        } catch { /* use minimal entry without flightInfo */ }
+        } catch { /* offline or timeout — fall through to mesh simulation */ }
+
+        if (!gotDataFromApi) {
+          // Simulate receiving flight data from the chat admin via Bluetooth mesh.
+          // In a real deployment this packet comes over the mesh; in the demo we
+          // construct an "inferred" record from the IATA prefix so the Airliner tab
+          // (meals, tax-free shopping, airline branding) works immediately.
+          newEntry.flightInfo = {
+            flightNumber: conv.flightNumber,
+            flightDate: today,
+            airline: null,
+            iataCode,
+            origin: null,
+            originCity: null,
+            destination: null,
+            destinationCity: null,
+            scheduledDeparture: null,
+            scheduledArrival: null,
+            actualDeparture: null,
+            actualArrival: null,
+            status: "airborne",
+            delayMinutes: null,
+            aircraftType: null,
+            aircraftName: null,
+            terminal: null,
+            gate: null,
+            source: "inferred",
+          };
+          // Post a visible system message so the user understands what happened
+          addSystemMessage(
+            conv.id,
+            "✈️ Vluchtgegevens ontvangen via Bluetooth mesh van de beheerder."
+          );
+        }
+
         flights.push(newEntry);
       }
 

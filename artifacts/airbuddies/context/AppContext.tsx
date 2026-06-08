@@ -156,6 +156,7 @@ interface AppContextType {
   activeSeatNumber: string | null;
   setActiveSeatNumber: (seat: string | null) => void;
   refreshActiveFlight: () => Promise<void>;
+  addSystemMessage: (conversationId: string, content: string) => void;
   deleteConversationsByFlightNumber: (flightNumber: string) => void;
   deleteAllConversations: () => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
@@ -868,6 +869,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [messages]);
 
+  const addSystemMessage = useCallback((conversationId: string, content: string) => {
+    const sysMsg: Message = {
+      id: `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      conversationId,
+      senderId: "system",
+      type: "system",
+      content,
+      timestamp: Date.now(),
+      status: "read",
+    };
+    setMessages((prev) => {
+      const updated = {
+        ...prev,
+        [conversationId]: [...(prev[conversationId] ?? []), sysMsg],
+      };
+      saveMessages(updated);
+      return updated;
+    });
+  }, []);
+
   const refreshActiveFlight = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem("my_flights_v1");
@@ -986,6 +1007,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeSeatNumber,
         setActiveSeatNumber,
         refreshActiveFlight,
+        addSystemMessage,
         deleteConversationsByFlightNumber,
         deleteAllConversations,
         deleteMessage,
