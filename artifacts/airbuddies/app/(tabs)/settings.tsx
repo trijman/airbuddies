@@ -202,6 +202,19 @@ export default function SettingsScreen() {
         <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
       </Pressable>
 
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Vlucht</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <SettingRow
+          icon="airplane-outline"
+          iconColor={colors.primary}
+          label="Mijn Vluchten"
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/my-flights");
+          }}
+        />
+      </View>
+
       {flights.length > 0 && (
         <>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Stoelnummers</Text>
@@ -299,19 +312,6 @@ export default function SettingsScreen() {
               : "Je bent onzichtbaar. Je kunt niet deelnemen aan openbare chats."}
           </Text>
         </View>
-      </View>
-
-      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Vlucht</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingRow
-          icon="airplane-outline"
-          iconColor={colors.primary}
-          label="Mijn Vluchten"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/my-flights");
-          }}
-        />
       </View>
 
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Chats</Text>
