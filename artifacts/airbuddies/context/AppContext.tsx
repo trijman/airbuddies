@@ -148,6 +148,7 @@ interface AppContextType {
   completeOnboarding: (data: Partial<UserProfile>) => Promise<void>;
   activeAirlineIata: string | null;
   setActiveAirlineIata: (iata: string | null) => void;
+  activeAircraftType: string | null;
   deleteConversationsByFlightNumber: (flightNumber: string) => void;
   deleteAllConversations: () => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
@@ -269,6 +270,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isScanning, setIsScanning] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [activeAirlineIata, setActiveAirlineIata] = useState<string | null>(null);
+  const [activeAircraftType, setActiveAircraftType] = useState<string | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -304,7 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const storedFlights = await AsyncStorage.getItem("my_flights_v1");
         if (storedFlights) {
-          const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string; scheduledDeparture?: string | null } }> = JSON.parse(storedFlights);
+          const flights: Array<{ flightNumber: string; flightDate: string; seatNumber?: string; flightInfo?: { iataCode?: string; scheduledDeparture?: string | null; aircraftType?: string | null } }> = JSON.parse(storedFlights);
           const now = new Date();
           const sorted = [...flights].sort((a, b) => {
             const aT = a.flightInfo?.scheduledDeparture ?? `${a.flightDate}T23:59:59`;
@@ -316,6 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (active) {
             const iata = active.flightInfo?.iataCode ?? active.flightNumber.slice(0, 2).toUpperCase();
             setActiveAirlineIata(iata);
+            setActiveAircraftType(active.flightInfo?.aircraftType ?? null);
           }
         }
       } catch { /* ignore */ }
@@ -904,6 +907,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         completeOnboarding,
         activeAirlineIata,
         setActiveAirlineIata,
+        activeAircraftType,
         deleteConversationsByFlightNumber,
         deleteAllConversations,
         deleteMessage,

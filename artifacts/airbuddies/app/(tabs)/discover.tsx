@@ -136,10 +136,25 @@ interface SeatInfo {
   name?: string;
 }
 
+const IATA_TO_CONFIG: Record<string, AircraftType> = {
+  A318: "A320", A319: "A320", A320: "A320", A20N: "A320", A319N: "A320",
+  A321: "A321", A21N: "A321", A321N: "A321",
+  B737: "B737", B738: "B737", B739: "B737", B38M: "B737", B39M: "B737", B736: "B737",
+  B777: "B777", B77W: "B777", B77L: "B777",
+  A380: "A380", A388: "A380",
+};
+
+function resolveAircraftType(iataCode: string | null | undefined): AircraftType | null {
+  if (!iataCode) return null;
+  return IATA_TO_CONFIG[iataCode.toUpperCase()] ?? null;
+}
+
 function SeatMap() {
   const colors = useColors();
-  const { profile, buddies, nearbyDevices } = useApp();
-  const [aircraftType, setAircraftType] = useState<AircraftType>("A320");
+  const { profile, buddies, nearbyDevices, activeAircraftType } = useApp();
+  const resolved = resolveAircraftType(activeAircraftType);
+  const [manualType, setManualType] = useState<AircraftType>("A320");
+  const aircraftType: AircraftType = resolved ?? manualType;
   const config = AIRCRAFT_CONFIGS[aircraftType];
 
   const seatMap = useMemo(() => {
@@ -180,34 +195,46 @@ function SeatMap() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.aircraftPicker}
-        style={[styles.aircraftPickerWrap, { borderBottomColor: colors.border }]}
-      >
-        {(Object.keys(AIRCRAFT_CONFIGS) as AircraftType[]).map((key) => (
-          <Pressable
-            key={key}
-            onPress={() => setAircraftType(key)}
-            style={[
-              styles.aircraftBtn,
-              {
-                backgroundColor: aircraftType === key ? colors.primary : colors.muted,
-              },
-            ]}
-          >
-            <Text
+      {resolved ? (
+        <View style={[styles.aircraftPickerWrap, { borderBottomColor: colors.border, paddingHorizontal: 16, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 }]}>
+          <Ionicons name="airplane" size={15} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>
+            {config.label}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_400Regular" }}>
+            · automatisch herkend
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.aircraftPicker}
+          style={[styles.aircraftPickerWrap, { borderBottomColor: colors.border }]}
+        >
+          {(Object.keys(AIRCRAFT_CONFIGS) as AircraftType[]).map((key) => (
+            <Pressable
+              key={key}
+              onPress={() => setManualType(key)}
               style={[
-                styles.aircraftBtnText,
-                { color: aircraftType === key ? colors.primaryForeground : colors.mutedForeground },
+                styles.aircraftBtn,
+                {
+                  backgroundColor: aircraftType === key ? colors.primary : colors.muted,
+                },
               ]}
             >
-              {key}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+              <Text
+                style={[
+                  styles.aircraftBtnText,
+                  { color: aircraftType === key ? colors.primaryForeground : colors.mutedForeground },
+                ]}
+              >
+                {key}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
       <ScrollView
         style={{ flex: 1 }}
