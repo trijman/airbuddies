@@ -5,13 +5,39 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 
 function getBadgeCount(conversations: ReturnType<typeof useApp>["conversations"]) {
   return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+}
+
+function AirlineTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  return (
+    <View style={{ alignItems: "center", justifyContent: "center" }}>
+      <View
+        style={{
+          backgroundColor: focused ? "#00a1de" : "transparent",
+          borderRadius: 8,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: "Inter_700Bold",
+            color: focused ? "#fff" : color,
+            letterSpacing: 0.5,
+          }}
+        >
+          KLM
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 function NativeTabLayout() {
@@ -28,6 +54,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="discover">
         <Icon sf={{ default: "antenna.radiowaves.left.and.right", selected: "antenna.radiowaves.left.and.right" }} />
         <Label>Discover</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="airline">
+        <Icon sf={{ default: "airplane.circle", selected: "airplane.circle.fill" }} />
+        <Label>KLM</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
@@ -113,6 +143,14 @@ function ClassicTabLayout() {
             ) : (
               <Ionicons name={focused ? "radio" : "radio-outline"} size={24} color={color} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="airline"
+        options={{
+          title: "KLM",
+          tabBarIcon: ({ color, focused }) => <AirlineTabIcon color={color} focused={focused} />,
+          tabBarActiveTintColor: "#00a1de",
         }}
       />
       <Tabs.Screen

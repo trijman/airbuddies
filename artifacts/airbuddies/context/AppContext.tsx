@@ -17,6 +17,16 @@ export interface ContactData {
   instagram?: string;
 }
 
+export interface MediaAttachment {
+  uri: string;
+  type: "image" | "document" | "audio";
+  name?: string;
+  size?: number;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -24,8 +34,9 @@ export interface Message {
   content: string;
   timestamp: number;
   status: MessageStatus;
-  type: "text" | "system" | "contact-card";
+  type: "text" | "system" | "contact-card" | "image" | "document" | "audio";
   contactData?: ContactData;
+  attachment?: MediaAttachment;
 }
 
 export type BuddyRelation = "buddy" | "pending_sent" | "pending_received" | "none";
@@ -109,6 +120,7 @@ interface AppContextType {
   isScanning: boolean;
   onboardingComplete: boolean | null;
   sendMessage: (conversationId: string, content: string) => void;
+  sendMediaMessage: (conversationId: string, attachment: MediaAttachment, caption?: string) => void;
   sendContactCard: (conversationId: string) => void;
   addBuddy: (buddy: Omit<Buddy, "isVerified" | "isFavorite" | "isBlocked" | "relation">) => void;
   removeBuddy: (buddyId: string) => void;
@@ -417,6 +429,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return updated;
         });
       }, 800);
+    },
+    [profile]
+  );
+
+  const sendMediaMessage = useCallback(
+    async (conversationId: string, attachment: MediaAttachment, caption = "") => {
+      if (!profile) return;
+      const label =
+        attachment.type === "image" ? (caption || "📷 Afbeelding")
+        : attachment.type === "document" ? (attachment.name ?? "📄 Document")
+        : (attachment.name ?? "🎵 Audio");
+      const newMsg: Message = {
+        id: generateId(),
+        conversationId,
+        senderId: profile.id,
+        content: label,
+        timestamp: Date.now(),
+        status: "sending",
+        type: attachment.type,
+        attachment,
+      };
+      setMessages((prev) => {
+        const updated = { ...prev, [conversationId]: [...(prev[conversationId] ?? []), newMsg] };
+        saveMessages(updated);
+        return updated;
+      });
+      setConversations((prev) => {
+        const updated = prev.map((c) =>
+          c.id === conversationId ? { ...c, lastMessage: newMsg } : c
+        );
+        saveConversations(updated);
+        return updated;
+      });
+      setTimeout(() => {
+        setMessages((prev) => {
+          const convMsgs = prev[conversationId] ?? [];
+          const updated = {
+            ...prev,
+            [conversationId]: convMsgs.map((m) =>
+              m.id === newMsg.id ? { ...m, status: "delivered" as MessageStatus } : m
+            ),
+          };
+          saveMessages(updated);
+          return updated;
+        });
+      }, 700);
     },
     [profile]
   );
@@ -772,6 +830,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         inviteToGroup,
         muteConversation,
         leaveGroup,
+        sendMediaMessage,
         completeOnboarding,
       }}
     >

@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,11 +17,14 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp } from "react-native-reanimated";
 
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+
 import { Avatar } from "@/components/Avatar";
 import { InviteModal } from "@/components/InviteModal";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
-import type { Message } from "@/context/AppContext";
+import type { Message, MediaAttachment } from "@/context/AppContext";
 
 function StatusIcon({ status }: { status: Message["status"] }) {
   const colors = useColors();
@@ -92,6 +96,26 @@ function ContactCardBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   );
 }
 
+function SenderLabel({ senderName, senderSeat, senderId }: { senderName?: string; senderSeat?: string; senderId?: string }) {
+  const colors = useColors();
+  if (!senderName) return null;
+  return (
+    <Pressable
+      style={styles.senderRow}
+      onPress={() => { if (senderId) router.push(`/profile/${senderId}`); }}
+      disabled={!senderId}
+    >
+      <Text style={[styles.senderLabel, { color: colors.primary }]}>{senderName}</Text>
+      {senderSeat && (
+        <View style={styles.senderSeatTag}>
+          <Ionicons name="airplane-outline" size={9} color={colors.primary + "99"} />
+          <Text style={[styles.senderSeat, { color: colors.primary + "99" }]}>{senderSeat}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: Message; isMe: boolean; senderName?: string; senderSeat?: string; senderId?: string }) {
   const colors = useColors();
 
@@ -104,6 +128,80 @@ function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: M
       <View style={styles.systemMsgWrap}>
         <Text style={[styles.systemMsg, { color: colors.mutedForeground }]}>{msg.content}</Text>
       </View>
+    );
+  }
+
+  if (msg.type === "image" && msg.attachment) {
+    const asp = (msg.attachment.height && msg.attachment.width)
+      ? msg.attachment.height / msg.attachment.width
+      : 0.75;
+    const imgW = 220;
+    const imgH = Math.min(Math.max(imgW * asp, 120), 280);
+    return (
+      <Animated.View
+        entering={FadeInUp.duration(200)}
+        style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
+      >
+        <View style={[styles.imageBubble, { borderColor: isMe ? colors.primary : colors.border }]}>
+          <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
+          <Image
+            source={{ uri: msg.attachment.uri }}
+            style={{ width: imgW, height: imgH, borderRadius: 12 }}
+            resizeMode="cover"
+          />
+          <View style={[styles.bubbleMeta, { paddingTop: 4 }]}>
+            <Text style={[styles.bubbleTime, { color: colors.mutedForeground }]}>
+              {formatMsgTime(msg.timestamp)}
+            </Text>
+            {isMe && <StatusIcon status={msg.status} />}
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  if (msg.type === "document" && msg.attachment) {
+    const sizeKB = msg.attachment.size ? Math.round(msg.attachment.size / 1024) : null;
+    const ext = msg.attachment.name?.split(".").pop()?.toUpperCase() ?? "FILE";
+    return (
+      <Animated.View
+        entering={FadeInUp.duration(200)}
+        style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
+      >
+        <View
+          style={[
+            styles.docBubble,
+            {
+              backgroundColor: isMe ? colors.primary : colors.card,
+              borderColor: isMe ? "transparent" : colors.border,
+            },
+          ]}
+        >
+          <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
+          <View style={styles.docRow}>
+            <View style={[styles.docIcon, { backgroundColor: isMe ? colors.primaryForeground + "22" : colors.muted }]}>
+              <Ionicons name="document-text" size={22} color={isMe ? colors.primaryForeground : colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.docName, { color: isMe ? colors.primaryForeground : colors.foreground }]}
+                numberOfLines={2}
+              >
+                {msg.attachment.name ?? "Document"}
+              </Text>
+              <Text style={[styles.docMeta, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
+                {ext}{sizeKB ? ` · ${sizeKB} KB` : ""}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.bubbleMeta}>
+            <Text style={[styles.bubbleTime, { color: isMe ? colors.primaryForeground + "99" : colors.mutedForeground }]}>
+              {formatMsgTime(msg.timestamp)}
+            </Text>
+            {isMe && <StatusIcon status={msg.status} />}
+          </View>
+        </View>
+      </Animated.View>
     );
   }
 
@@ -124,21 +222,7 @@ function MessageBubble({ msg, isMe, senderName, senderSeat, senderId }: { msg: M
           },
         ]}
       >
-        {senderName && !isMe && (
-          <Pressable
-            style={styles.senderRow}
-            onPress={() => { if (senderId) router.push(`/profile/${senderId}`); }}
-            disabled={!senderId}
-          >
-            <Text style={[styles.senderLabel, { color: colors.primary }]}>{senderName}</Text>
-            {senderSeat && (
-              <View style={styles.senderSeatTag}>
-                <Ionicons name="airplane-outline" size={9} color={colors.primary + "99"} />
-                <Text style={[styles.senderSeat, { color: colors.primary + "99" }]}>{senderSeat}</Text>
-              </View>
-            )}
-          </Pressable>
-        )}
+        <SenderLabel senderName={senderName} senderSeat={senderSeat} senderId={senderId} />
         <Text
           style={[
             styles.bubbleText,
@@ -167,7 +251,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -246,6 +330,81 @@ export default function ChatScreen() {
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     sendContactCard(id);
+  };
+
+  const handlePickImage = async () => {
+    if (!id) return;
+    setShowAttach(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Toegang geweigerd", "Geef toegang tot je fotobibliotheek in de instellingen.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const attachment: MediaAttachment = {
+        uri: asset.uri,
+        type: "image",
+        width: asset.width,
+        height: asset.height,
+        mimeType: asset.mimeType ?? "image/jpeg",
+      };
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      sendMediaMessage(id, attachment);
+    }
+  };
+
+  const handlePickCamera = async () => {
+    if (!id) return;
+    setShowAttach(false);
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Toegang geweigerd", "Geef toegang tot je camera in de instellingen.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const attachment: MediaAttachment = {
+        uri: asset.uri,
+        type: "image",
+        mimeType: asset.mimeType ?? "image/jpeg",
+      };
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      sendMediaMessage(id, attachment);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    if (!id) return;
+    setShowAttach(false);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const attachment: MediaAttachment = {
+          uri: asset.uri,
+          type: "document",
+          name: asset.name,
+          size: asset.size ?? undefined,
+          mimeType: asset.mimeType ?? undefined,
+        };
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        sendMediaMessage(id, attachment);
+      }
+    } catch {
+      Alert.alert("Fout", "Kon document niet openen.");
+    }
   };
 
   const handleMore = () => {
@@ -409,17 +568,31 @@ export default function ChatScreen() {
         <View style={[styles.attachMenu, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
           <Pressable
             style={[styles.attachOption, { backgroundColor: colors.secondary }]}
-            onPress={handleContactCard}
+            onPress={handlePickImage}
           >
-            <Ionicons name="person-circle-outline" size={26} color={colors.primary} />
-            <Text style={[styles.attachLabel, { color: colors.foreground }]}>Contactkaart</Text>
+            <Ionicons name="image-outline" size={26} color={colors.primary} />
+            <Text style={[styles.attachLabel, { color: colors.foreground }]}>Foto</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.attachOption, { backgroundColor: colors.secondary }]}
+            onPress={handlePickCamera}
+          >
+            <Ionicons name="camera-outline" size={26} color={colors.primary} />
+            <Text style={[styles.attachLabel, { color: colors.foreground }]}>Camera</Text>
           </Pressable>
           <Pressable
             style={[styles.attachOption, { backgroundColor: colors.muted }]}
-            onPress={() => setShowAttach(false)}
+            onPress={handlePickDocument}
           >
-            <Ionicons name="close-circle-outline" size={26} color={colors.mutedForeground} />
-            <Text style={[styles.attachLabel, { color: colors.mutedForeground }]}>Sluiten</Text>
+            <Ionicons name="document-outline" size={26} color={colors.mutedForeground} />
+            <Text style={[styles.attachLabel, { color: colors.foreground }]}>Document</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.attachOption, { backgroundColor: colors.muted }]}
+            onPress={handleContactCard}
+          >
+            <Ionicons name="person-circle-outline" size={26} color={colors.mutedForeground} />
+            <Text style={[styles.attachLabel, { color: colors.foreground }]}>Contactkaart</Text>
           </Pressable>
         </View>
       )}
@@ -534,6 +707,25 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22 },
   bubbleMeta: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end" },
   bubbleTime: { fontSize: 11 },
+  imageBubble: {
+    maxWidth: "78%",
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 6,
+    gap: 2,
+  },
+  docBubble: {
+    maxWidth: "78%",
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  docRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  docIcon: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  docName: { fontSize: 14, fontFamily: "Inter_500Medium", lineHeight: 18 },
+  docMeta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   systemMsgWrap: { alignItems: "center", paddingVertical: 8 },
   systemMsg: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
   contactCard: {
