@@ -146,6 +146,8 @@ interface AppContextType {
   muteConversation: (conversationId: string, muted: boolean) => void;
   leaveGroup: (conversationId: string) => void;
   completeOnboarding: (data: Partial<UserProfile>) => Promise<void>;
+  activeAirlineIata: string | null;
+  setActiveAirlineIata: (iata: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -263,6 +265,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [nearbyDevices, setNearbyDevices] = useState<NearbyDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [activeAirlineIata, setActiveAirlineIata] = useState<string | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -293,6 +296,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProfile(newProfile);
         await AsyncStorage.setItem("profile_v2", JSON.stringify(newProfile));
       }
+
+      // Load active airline from registered flights
+      try {
+        const storedFlights = await AsyncStorage.getItem("my_flights_v1");
+        if (storedFlights) {
+          const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string } }> = JSON.parse(storedFlights);
+          const today = new Date().toISOString().slice(0, 10);
+          const active = flights.find((f) => f.flightDate === today)
+            ?? flights.sort((a, b) => a.flightDate.localeCompare(b.flightDate))[0];
+          if (active) {
+            const iata = active.flightInfo?.iataCode ?? active.flightNumber.slice(0, 2).toUpperCase();
+            setActiveAirlineIata(iata);
+          }
+        }
+      } catch { /* ignore */ }
 
       const storedConvs = await AsyncStorage.getItem("conversations_v2");
       const storedMsgs = await AsyncStorage.getItem("messages_v2");
@@ -832,6 +850,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         leaveGroup,
         sendMediaMessage,
         completeOnboarding,
+        activeAirlineIata,
+        setActiveAirlineIata,
       }}
     >
       {children}

@@ -4,9 +4,8 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
+import React from "react";
+import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
@@ -52,33 +51,9 @@ const AIRLINE_TAB: Record<string, { label: string; color: string }> = {
 };
 
 function useActiveAirline() {
-  const [airline, setAirline] = useState<{ label: string; color: string } | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const stored = await AsyncStorage.getItem("my_flights_v1");
-        if (!stored) return;
-        const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string } }> = JSON.parse(stored);
-        if (!flights.length) return;
-
-        const today = new Date().toISOString().slice(0, 10);
-        const active = flights.find((f) => f.flightDate === today)
-          ?? flights.sort((a, b) => a.flightDate.localeCompare(b.flightDate))[0];
-
-        if (!active) return;
-
-        const iata = active.flightInfo?.iataCode
-          ?? active.flightNumber.slice(0, 2).toUpperCase();
-
-        const brand = AIRLINE_TAB[iata];
-        if (brand) setAirline(brand);
-      } catch { /* ignore */ }
-    }
-    load();
-  }, []);
-
-  return airline;
+  const { activeAirlineIata } = useApp();
+  if (!activeAirlineIata) return null;
+  return AIRLINE_TAB[activeAirlineIata] ?? null;
 }
 
 function AirlineTabIcon({ color, focused, airlineColor }: { color: string; focused: boolean; airlineColor: string }) {

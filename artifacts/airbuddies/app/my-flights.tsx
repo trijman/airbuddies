@@ -244,7 +244,7 @@ function FlightInfoCard({ info, onConfirm, onCancel }: {
 export default function MyFlightsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, createGroup } = useApp();
+  const { profile, createGroup, setActiveAirlineIata } = useApp();
   const isWeb = Platform.OS === "web";
 
   const topPad = isWeb ? 67 : insets.top;
@@ -399,6 +399,10 @@ export default function MyFlightsScreen() {
       };
       const updated = [...registeredFlights, newFlight];
       await saveRegisteredFlights(updated);
+
+      // Update reactive airline context so tab label changes instantly
+      const iata = searchResult?.iataCode ?? fn.slice(0, 2).toUpperCase();
+      setActiveAirlineIata(iata);
 
       const key = `${fn}_${date}`;
       const count = await fetchPassengerCount(fn, date);
