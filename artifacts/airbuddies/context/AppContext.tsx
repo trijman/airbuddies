@@ -142,6 +142,7 @@ interface AppContextType {
   startConversation: (buddyId: string) => Conversation;
   markAsRead: (conversationId: string) => void;
   clearChatHistory: (conversationId: string) => void;
+  deleteConversation: (conversationId: string) => void;
   inviteToGroup: (conversationId: string, buddyIds: string[]) => void;
   muteConversation: (conversationId: string, muted: boolean) => void;
   leaveGroup: (conversationId: string) => void;
@@ -764,6 +765,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const deleteConversation = useCallback((conversationId: string) => {
+    setMessages((prev) => {
+      const updated = { ...prev };
+      delete updated[conversationId];
+      saveMessages(updated);
+      return updated;
+    });
+    setConversations((prev) => {
+      const updated = prev.filter((c) => c.id !== conversationId);
+      saveConversations(updated);
+      return updated;
+    });
+  }, []);
+
   const clearChatHistory = useCallback((conversationId: string) => {
     setMessages((prev) => {
       const updated = { ...prev, [conversationId]: [] };
@@ -904,6 +919,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         startConversation,
         markAsRead,
         clearChatHistory,
+        deleteConversation,
         inviteToGroup,
         muteConversation,
         leaveGroup,

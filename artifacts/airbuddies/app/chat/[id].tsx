@@ -287,7 +287,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, muteConversation, leaveGroup, deleteMessage } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, muteConversation, leaveGroup, deleteMessage } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -305,10 +305,11 @@ export default function ChatScreen() {
     useCallback(() => {
       if (!conv?.flightNumber) { setSeatGate(false); return; }
       AsyncStorage.getItem("my_flights_v1").then((stored) => {
-        if (!stored) { setSeatGate(true); return; }
+        if (!stored) { setSeatGate(false); return; }
         const flights: Array<{ flightNumber: string; seatNumber?: string }> = JSON.parse(stored);
         const match = flights.find((f) => f.flightNumber === conv.flightNumber);
-        setSeatGate(!match?.seatNumber);
+        // Only gate if this flight is actually registered AND no seat number yet
+        setSeatGate(!!match && !match.seatNumber);
       }).catch(() => setSeatGate(false));
     }, [conv?.flightNumber])
   );
@@ -492,6 +493,22 @@ export default function ChatScreen() {
           Alert.alert("Wis geschiedenis", "Wil je alle berichten verwijderen?", [
             { text: "Annuleer", style: "cancel" },
             { text: "Verwijder", style: "destructive", onPress: () => clearChatHistory(id ?? "") },
+          ]),
+      },
+      {
+        text: "Verwijder gesprek",
+        style: "destructive",
+        onPress: () =>
+          Alert.alert("Verwijder gesprek", "Wil je dit gesprek verwijderen? Dit kan niet ongedaan worden gemaakt.", [
+            { text: "Annuleer", style: "cancel" },
+            {
+              text: "Verwijder",
+              style: "destructive",
+              onPress: () => {
+                deleteConversation(id ?? "");
+                router.back();
+              },
+            },
           ]),
       },
     ];
