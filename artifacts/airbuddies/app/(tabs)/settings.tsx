@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   Alert,
   Platform,
@@ -10,14 +11,23 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "@/components/Avatar";
 import { InterestChip } from "@/components/InterestChip";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+
+interface RegisteredFlight {
+  flightNumber: string;
+  flightDate: string;
+  seatNumber?: string;
+  flightInfo?: { iataCode?: string; origin?: string; destination?: string };
+}
 
 interface SettingRowProps {
   icon: string;
@@ -70,6 +80,44 @@ export default function SettingsScreen() {
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
 
+  const [flights, setFlights] = useState<RegisteredFlight[]>([]);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem("my_flights_v1").then((raw) => {
+        if (raw) setFlights(JSON.parse(raw));
+        else setFlights([]);
+      });
+    }, [])
+  );
+
+  const flightKey = (f: RegisteredFlight) => `${f.flightNumber}_${f.flightDate}`;
+
+  const startEdit = (f: RegisteredFlight) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingKey(flightKey(f));
+    setEditValue(f.seatNumber ?? "");
+  };
+
+  const cancelEdit = () => {
+    setEditingKey(null);
+    setEditValue("");
+  };
+
+  const saveEdit = async (f: RegisteredFlight) => {
+    const seat = editValue.trim().toUpperCase();
+    const updated = flights.map((fl) =>
+      flightKey(fl) === flightKey(f) ? { ...fl, seatNumber: seat || undefined } : fl
+    );
+    await AsyncStorage.setItem("my_flights_v1", JSON.stringify(updated));
+    setFlights(updated);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setEditingKey(null);
+    setEditValue("");
+  };
+
   const fp = profile?.fingerprint ?? "";
   const fpDisplay = fp.slice(0, 11) + "..." + fp.slice(-5);
 
@@ -121,13 +169,75 @@ export default function SettingsScreen() {
         <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
       </Pressable>
 
-      {profile?.seatNumber && (
-        <View style={[styles.seatBanner, { backgroundColor: colors.secondary, borderColor: colors.primary + "44" }]}>
-          <Ionicons name="airplane-outline" size={18} color={colors.primary} />
-          <Text style={[styles.seatText, { color: colors.primary }]}>
-            Jouw stoel: <Text style={{ fontFamily: "Inter_700Bold" }}>{profile.seatNumber}</Text>
-          </Text>
-        </View>
+      {flights.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Stoelnummers</Text>
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {flights.map((f, i) => {
+              const key = flightKey(f);
+              const isEditing = editingKey === key;
+              const dest = f.flightInfo?.destination ?? f.flightNumber.slice(2);
+              return (
+                <View key={key}>
+                  {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.settingRow,
+                      { backgroundColor: pressed && !isEditing ? colors.muted : colors.card },
+                    ]}
+                    onPress={() => !isEditing && startEdit(f)}
+                  >
+                    <View style={[styles.settingIcon, { backgroundColor: colors.primary + "22" }]}>
+                      <Ionicons name="airplane-outline" size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.settingLabel, { color: colors.foreground, flex: 0 }]}>
+                        {f.flightNumber}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
+                        {dest} · {f.flightDate}
+                      </Text>
+                    </View>
+                    {!isEditing && (
+                      <View style={styles.settingRight}>
+                        <Text style={[styles.settingValue, { color: f.seatNumber ? colors.primary : colors.mutedForeground }]}>
+                          {f.seatNumber ?? "Niet ingesteld"}
+                        </Text>
+                        <Ionicons name="pencil-outline" size={15} color={colors.mutedForeground} />
+                      </View>
+                    )}
+                  </Pressable>
+                  {isEditing && (
+                    <View style={[styles.seatEditRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                      <TextInput
+                        style={[styles.seatEditInput, { color: colors.foreground, borderColor: colors.primary, backgroundColor: colors.card }]}
+                        value={editValue}
+                        onChangeText={(t) => setEditValue(t.toUpperCase())}
+                        placeholder="bijv. 14A"
+                        placeholderTextColor={colors.mutedForeground}
+                        autoCapitalize="characters"
+                        maxLength={5}
+                        autoFocus
+                        returnKeyType="done"
+                        onSubmitEditing={() => saveEdit(f)}
+                      />
+                      <Pressable
+                        style={[styles.seatEditBtn, { backgroundColor: colors.primary, opacity: editValue.trim() ? 1 : 0.4 }]}
+                        onPress={() => saveEdit(f)}
+                        disabled={!editValue.trim()}
+                      >
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                      </Pressable>
+                      <Pressable style={[styles.seatEditBtn, { backgroundColor: colors.muted }]} onPress={cancelEdit}>
+                        <Ionicons name="close" size={18} color={colors.mutedForeground} />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </>
       )}
 
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Zichtbaarheid</Text>
@@ -256,17 +366,32 @@ const styles = StyleSheet.create({
   profileBio: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   interestRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
   moreInterests: { fontSize: 12, fontFamily: "Inter_400Regular", alignSelf: "center" },
-  seatBanner: {
+  seatEditRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  seatText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  seatEditInput: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 3,
+    textAlign: "center",
+  },
+  seatEditBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionLabel: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
