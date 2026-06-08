@@ -89,7 +89,6 @@ export default function EditProfileScreen() {
   const [age, setAge] = useState(profile?.age?.toString() ?? "");
   const [gender, setGender] = useState(profile?.gender ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
-  const [seatNumber, setSeatNumber] = useState(profile?.seatNumber ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [instagram, setInstagram] = useState(profile?.instagram ?? "");
@@ -116,7 +115,6 @@ export default function EditProfileScreen() {
       age: age ? parseInt(age, 10) : undefined,
       gender: gender || undefined,
       bio: bio.trim() || undefined,
-      seatNumber: seatNumber.trim() || undefined,
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
       instagram: instagram.trim() || undefined,
@@ -211,10 +209,6 @@ export default function EditProfileScreen() {
               maxLength={200}
               multiline
             />
-          </Field>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Field label="Stoelnummer">
-            <Input value={seatNumber} onChangeText={setSeatNumber} placeholder="bijv. 14A" maxLength={5} />
           </Field>
         </View>
 
