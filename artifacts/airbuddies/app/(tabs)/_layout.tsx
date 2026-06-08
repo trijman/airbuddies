@@ -4,7 +4,8 @@ import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
@@ -14,33 +15,89 @@ function getBadgeCount(conversations: ReturnType<typeof useApp>["conversations"]
   return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 }
 
-function AirlineTabIcon({ color, focused }: { color: string; focused: boolean }) {
+// ─── Airline IATA → short name & color ────────────────────────────────────────
+const AIRLINE_TAB: Record<string, { label: string; color: string }> = {
+  KL: { label: "KLM", color: "#00a1de" },
+  HV: { label: "Transavia", color: "#00c800" },
+  TO: { label: "Transavia", color: "#00c800" },
+  OR: { label: "TUI", color: "#e2001a" },
+  LH: { label: "Lufthansa", color: "#05164d" },
+  BA: { label: "BA", color: "#075aaa" },
+  AF: { label: "Air France", color: "#002157" },
+  EK: { label: "Emirates", color: "#c8102e" },
+  QR: { label: "Qatar", color: "#5c0632" },
+  LX: { label: "SWISS", color: "#e30613" },
+  SK: { label: "SAS", color: "#005daa" },
+  AY: { label: "Finnair", color: "#1d6bae" },
+  TK: { label: "Turkish", color: "#c8102e" },
+  FR: { label: "Ryanair", color: "#073590" },
+  U2: { label: "easyJet", color: "#ff6600" },
+  W6: { label: "Wizz Air", color: "#c6007e" },
+  PC: { label: "Pegasus", color: "#f0780a" },
+  SN: { label: "Brussels", color: "#003087" },
+  VY: { label: "Vueling", color: "#f9c005" },
+  IB: { label: "Iberia", color: "#c8102e" },
+  TP: { label: "TAP", color: "#007749" },
+  SQ: { label: "Singapore", color: "#1a1a2e" },
+  EY: { label: "Etihad", color: "#bd8b13" },
+  CX: { label: "Cathay", color: "#006564" },
+  AA: { label: "American", color: "#0078d2" },
+  UA: { label: "United", color: "#002244" },
+  DL: { label: "Delta", color: "#003366" },
+  VS: { label: "Virgin", color: "#c8102e" },
+  QF: { label: "Qantas", color: "#c8102e" },
+  ET: { label: "Ethiopian", color: "#006940" },
+  BY: { label: "TUI", color: "#e2001a" },
+  X3: { label: "TUI", color: "#e2001a" },
+};
+
+function useActiveAirline() {
+  const [airline, setAirline] = useState<{ label: string; color: string } | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const stored = await AsyncStorage.getItem("my_flights_v1");
+        if (!stored) return;
+        const flights: Array<{ flightNumber: string; flightDate: string; flightInfo?: { iataCode?: string } }> = JSON.parse(stored);
+        if (!flights.length) return;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const active = flights.find((f) => f.flightDate === today)
+          ?? flights.sort((a, b) => a.flightDate.localeCompare(b.flightDate))[0];
+
+        if (!active) return;
+
+        const iata = active.flightInfo?.iataCode
+          ?? active.flightNumber.slice(0, 2).toUpperCase();
+
+        const brand = AIRLINE_TAB[iata];
+        if (brand) setAirline(brand);
+      } catch { /* ignore */ }
+    }
+    load();
+  }, []);
+
+  return airline;
+}
+
+function AirlineTabIcon({ color, focused, airlineColor }: { color: string; focused: boolean; airlineColor: string }) {
+  const activeColor = airlineColor;
   return (
     <View style={{ alignItems: "center", justifyContent: "center" }}>
-      <View
-        style={{
-          backgroundColor: focused ? "#00a1de" : "transparent",
-          borderRadius: 8,
-          paddingHorizontal: 6,
-          paddingVertical: 2,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 11,
-            fontFamily: "Inter_700Bold",
-            color: focused ? "#fff" : color,
-            letterSpacing: 0.5,
-          }}
-        >
-          KLM
-        </Text>
-      </View>
+      <Ionicons
+        name={focused ? "airplane" : "airplane-outline"}
+        size={24}
+        color={focused ? activeColor : color}
+      />
     </View>
   );
 }
 
 function NativeTabLayout() {
+  const airline = useActiveAirline();
+  const label = airline?.label ?? "Airline";
+
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -57,7 +114,7 @@ function NativeTabLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="airline">
         <Icon sf={{ default: "airplane.circle", selected: "airplane.circle.fill" }} />
-        <Label>KLM</Label>
+        <Label>{label}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
@@ -73,6 +130,10 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const airline = useActiveAirline();
+
+  const airlineLabel = airline?.label ?? "Airline";
+  const airlineColor = airline?.color ?? colors.primary;
 
   return (
     <Tabs
@@ -96,12 +157,7 @@ function ClassicTabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : isWeb ? (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.card },
-              ]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           ) : null,
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
@@ -148,9 +204,11 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="airline"
         options={{
-          title: "KLM",
-          tabBarIcon: ({ color, focused }) => <AirlineTabIcon color={color} focused={focused} />,
-          tabBarActiveTintColor: "#00a1de",
+          title: airlineLabel,
+          tabBarActiveTintColor: airlineColor,
+          tabBarIcon: ({ color, focused }) => (
+            <AirlineTabIcon color={color} focused={focused} airlineColor={airlineColor} />
+          ),
         }}
       />
       <Tabs.Screen
