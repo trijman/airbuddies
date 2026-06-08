@@ -63,6 +63,7 @@ export default function GroupInfoScreen() {
         name: profile.name,
         status: "online" as const,
         seatNumber: profile.seatNumber,
+        avatarUri: profile.avatarUri,
         isMe: true,
       };
     }
@@ -72,6 +73,7 @@ export default function GroupInfoScreen() {
       name: buddy?.name ?? "Onbekende passagier",
       status: buddy?.status ?? "offline",
       seatNumber: buddy?.seatNumber,
+      avatarUri: buddy?.avatarUri,
       isMe: false,
       isBuddy: !!buddy && buddy.relation === "buddy",
     };
@@ -222,6 +224,7 @@ export default function GroupInfoScreen() {
               <Avatar
                 name={member.name}
                 size={44}
+                uri={member.avatarUri}
                 showOnlineIndicator
                 isOnline={member.status === "online"}
                 isNearby={member.status === "nearby"}
