@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Plane, LayoutDashboard, Ticket, PlaneTakeoff } from "lucide-react";
+import { LayoutDashboard, Ticket, PlaneTakeoff } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -19,9 +19,9 @@ export function Layout({ children }: LayoutProps) {
       {/* Sidebar */}
       <div className="w-64 border-r border-border bg-sidebar flex flex-col">
         <div className="h-16 flex items-center px-6 border-b border-border">
-          <Link href="/" className="flex items-center gap-2 text-primary font-bold text-lg cursor-pointer">
-            <Plane className="w-5 h-5" />
-            <span>Airbuddies</span>
+          <Link href="/" className="flex items-center gap-2 font-bold text-lg cursor-pointer">
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Airbuddies" className="h-7 w-7 object-contain" />
+            <span className="text-foreground">Airbuddies</span>
           </Link>
         </div>
         

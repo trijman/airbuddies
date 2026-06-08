@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Plane, ChevronRight, Globe, Shield, Activity } from "lucide-react";
+import { ChevronRight, Globe, Shield, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -7,9 +7,9 @@ export function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
       <header className="h-16 border-b border-border flex items-center justify-between px-8 max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl">
-          <Plane className="w-6 h-6" />
-          <span>Airbuddies</span>
+        <div className="flex items-center gap-2 font-bold text-xl">
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Airbuddies" className="h-8 w-8 object-contain" />
+          <span className="text-foreground">Airbuddies</span>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/dashboard">
