@@ -83,6 +83,7 @@ function BuddyCard({
           <Avatar
             name={buddy.name}
             size={52}
+            uri={buddy.avatarUri}
             showOnlineIndicator
             isOnline={buddy.status === "online"}
             isNearby={buddy.status === "nearby"}
@@ -210,6 +211,7 @@ function RequestCard({
           <Avatar
             name={buddy.name}
             size={52}
+            uri={buddy.avatarUri}
             showOnlineIndicator
             isOnline={buddy.status === "online"}
             isNearby={buddy.status === "nearby"}
@@ -452,7 +454,7 @@ export default function BuddiesScreen() {
                   onPress={() => setSelectedBuddy(item)}
                 >
                   <View style={styles.cardTop}>
-                    <Avatar name={item.name} size={48} />
+                    <Avatar name={item.name} size={48} uri={item.avatarUri} />
                     <View style={styles.cardInfo}>
                       <Text style={[styles.buddyName, { color: colors.foreground }]}>{item.name}</Text>
                       {item.seatNumber && (

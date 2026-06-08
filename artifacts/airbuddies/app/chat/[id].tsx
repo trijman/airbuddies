@@ -334,8 +334,8 @@ export default function ChatScreen() {
     }
   };
 
-  const { title, isOnline, isNearby, isFlight, memberCount } = useMemo(() => {
-    if (!conv) return { title: "Chat", isOnline: false, isNearby: false, isFlight: false, memberCount: 0 };
+  const { title, isOnline, isNearby, isFlight, memberCount, headerAvatarUri } = useMemo(() => {
+    if (!conv) return { title: "Chat", isOnline: false, isNearby: false, isFlight: false, memberCount: 0, headerAvatarUri: undefined };
     if (conv.type === "group") {
       return {
         title: conv.name ?? "Groep",
@@ -343,6 +343,7 @@ export default function ChatScreen() {
         isNearby: false,
         isFlight: !!conv.flightNumber,
         memberCount: conv.participantIds.length,
+        headerAvatarUri: undefined,
       };
     }
     const buddyId = conv.participantIds.find((pid) => pid !== profile?.id);
@@ -353,6 +354,7 @@ export default function ChatScreen() {
       isNearby: buddy?.status === "nearby",
       isFlight: false,
       memberCount: 2,
+      headerAvatarUri: buddy?.avatarUri,
     };
   }, [conv, buddies, profile]);
 
@@ -592,6 +594,7 @@ export default function ChatScreen() {
             name={title}
             size={36}
             isGroup={isGroup}
+            uri={headerAvatarUri}
             showOnlineIndicator={!isGroup}
             isOnline={isOnline}
             isNearby={isNearby}
@@ -821,7 +824,7 @@ export default function ChatScreen() {
                         );
                       }}
                     >
-                      <Avatar seed={buddy?.id ?? pid} name={name} size={36} />
+                      <Avatar seed={buddy?.id ?? pid} name={name} size={36} uri={buddy?.avatarUri} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.adminPickerName, { color: colors.foreground }]}>{name}</Text>
                         {buddy?.seatNumber && (

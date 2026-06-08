@@ -56,6 +56,7 @@ export interface Buddy {
   bio?: string;
   interests?: string[];
   seatNumber?: string;
+  avatarUri?: string;
   gender?: string;
 }
 

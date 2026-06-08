@@ -130,6 +130,7 @@ export default function ProfileScreen() {
         <Avatar
           name={buddy.name}
           size={88}
+          uri={buddy.avatarUri}
           showOnlineIndicator
           isOnline={buddy.status === "online"}
           isNearby={buddy.status === "nearby"}
