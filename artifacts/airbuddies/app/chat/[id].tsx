@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
@@ -695,7 +696,10 @@ export default function ChatScreen() {
 
       {/* Seat gate overlay for public flight chats */}
       {isFlight && seatGate && (
-        <View style={[styles.seatGate, { backgroundColor: colors.background }]}>
+        <RNKeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={[styles.seatGate, { backgroundColor: colors.background }]}
+        >
           <Ionicons name="airplane" size={48} color={colors.primary} style={{ marginBottom: 8 }} />
           <Text style={[styles.seatGateTitle, { color: colors.foreground }]}>Stoelnummer vereist</Text>
           <Text style={[styles.seatGateSub, { color: colors.mutedForeground }]}>
@@ -718,7 +722,6 @@ export default function ChatScreen() {
             maxLength={5}
             returnKeyType="done"
             onSubmitEditing={handleSeatGateConfirm}
-            autoFocus
           />
           <Pressable
             style={[
@@ -731,7 +734,7 @@ export default function ChatScreen() {
             <Ionicons name="chatbubbles-outline" size={18} color="#fff" />
             <Text style={styles.seatGateBtnText}>Deelnemen aan vluchtchat</Text>
           </Pressable>
-        </View>
+        </RNKeyboardAvoidingView>
       )}
     </KeyboardAvoidingView>
   );

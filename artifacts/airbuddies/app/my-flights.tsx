@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -735,38 +736,48 @@ export default function MyFlightsScreen() {
       </ScrollView>
 
       {/* Seat Number Modal */}
-      <Modal visible={seatModalVisible} transparent animationType="fade" statusBarTranslucent>
-        <View style={styles.seatOverlay}>
-          <View style={[styles.seatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Ionicons name="airplane-outline" size={32} color={colors.primary} style={{ alignSelf: "center", marginBottom: 4 }} />
-            <Text style={[styles.seatCardTitle, { color: colors.foreground }]}>Wat is jouw stoelnummer?</Text>
-            <Text style={[styles.seatCardSub, { color: colors.mutedForeground }]}>
-              Vlucht {pendingSeatFlight?.flightNumber} · stoelnummer is zichtbaar in de vluchtchat
-            </Text>
-            <TextInput
-              style={[styles.seatInput, { color: colors.foreground, borderColor: seatInput ? colors.primary : colors.border, backgroundColor: colors.background }]}
-              placeholder="bijv. 14A"
-              placeholderTextColor={colors.mutedForeground}
-              value={seatInput}
-              onChangeText={(t) => setSeatInput(t.toUpperCase())}
-              autoCapitalize="characters"
-              autoFocus
-              maxLength={5}
-              returnKeyType="done"
-              onSubmitEditing={handleConfirmSeat}
-            />
-            <Pressable
-              style={[styles.seatConfirmBtn, { backgroundColor: colors.primary, opacity: seatInput.trim() ? 1 : 0.45 }]}
-              onPress={handleConfirmSeat}
-              disabled={!seatInput.trim()}
+      <Modal visible={seatModalVisible} transparent animationType="slide" statusBarTranslucent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.seatOverlay}>
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.seatConfirmText}>Bevestig stoelnummer</Text>
-            </Pressable>
-            <Pressable onPress={handleSkipSeat} style={styles.seatSkipBtn}>
-              <Text style={[styles.seatSkipText, { color: colors.mutedForeground }]}>Weet ik nog niet</Text>
-            </Pressable>
+              <View style={[styles.seatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Ionicons name="airplane-outline" size={32} color={colors.primary} style={{ alignSelf: "center", marginBottom: 4 }} />
+                <Text style={[styles.seatCardTitle, { color: colors.foreground }]}>Wat is jouw stoelnummer?</Text>
+                <Text style={[styles.seatCardSub, { color: colors.mutedForeground }]}>
+                  Vlucht {pendingSeatFlight?.flightNumber} · zichtbaar in de vluchtchat
+                </Text>
+                <TextInput
+                  style={[styles.seatInput, { color: colors.foreground, borderColor: seatInput ? colors.primary : colors.border, backgroundColor: colors.background }]}
+                  placeholder="bijv. 14A"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={seatInput}
+                  onChangeText={(t) => setSeatInput(t.toUpperCase())}
+                  autoCapitalize="characters"
+                  maxLength={5}
+                  returnKeyType="done"
+                  onSubmitEditing={handleConfirmSeat}
+                />
+                <Pressable
+                  style={[styles.seatConfirmBtn, { backgroundColor: colors.primary, opacity: seatInput.trim() ? 1 : 0.45 }]}
+                  onPress={handleConfirmSeat}
+                  disabled={!seatInput.trim()}
+                >
+                  <Text style={styles.seatConfirmText}>Bevestig stoelnummer</Text>
+                </Pressable>
+                <Pressable onPress={handleSkipSeat} style={styles.seatSkipBtn}>
+                  <Text style={[styles.seatSkipText, { color: colors.mutedForeground }]}>Weet ik nog niet</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -939,16 +950,17 @@ const styles = StyleSheet.create({
   seatOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+    justifyContent: "flex-end",
   },
   seatCard: {
-    width: "100%",
-    maxWidth: 360,
-    borderRadius: 24,
-    borderWidth: 1,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderTopWidth: 1,
+    borderBottomWidth: 0,
     padding: 28,
+    paddingBottom: 40,
     gap: 12,
   },
   seatCardTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
