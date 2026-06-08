@@ -248,7 +248,7 @@ function FlightInfoCard({ info, onConfirm, onCancel }: {
 export default function MyFlightsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, createGroup, setActiveAirlineIata, conversations, deleteConversationsByFlightNumber } = useApp();
+  const { profile, updateProfile, createGroup, setActiveAirlineIata, conversations, deleteConversationsByFlightNumber } = useApp();
   const [seatModalVisible, setSeatModalVisible] = useState(false);
   const [pendingSeatFlight, setPendingSeatFlight] = useState<RegisteredFlight | null>(null);
   const [seatInput, setSeatInput] = useState("");
@@ -545,6 +545,8 @@ export default function MyFlightsScreen() {
         : f
     );
     await saveRegisteredFlights(updated);
+    // Sync to profile so airline tab and seat map always match
+    updateProfile({ seatNumber: seat });
     setSeatModalVisible(false);
     if (pendingCount) {
       showPassengerAlert(pendingCount.count, pendingCount.flightNumber);
