@@ -747,7 +747,7 @@ export default function ChatScreen() {
           );
         }}
         contentContainerStyle={styles.msgList}
-        keyboardDismissMode="interactive"
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         scrollEnabled={!!convMessages.length}
