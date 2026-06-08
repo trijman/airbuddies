@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -26,7 +27,19 @@ const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
   ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
   : "/api";
 
+const WEB_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/web`
+  : "http://localhost:80/web";
+
 const SEAT_RE = /^([1-9]|[1-5][0-9]|60)[A-K]$/i;
+const SYNC_KEY = "online_sync_v1";
+
+interface OnlineSync {
+  registered: boolean;
+  email?: string;
+  syncEnabled: boolean;
+  lastSync: string | null;
+}
 
 interface RegisteredFlight {
   flightNumber: string;
@@ -95,6 +108,12 @@ export default function SettingsScreen() {
   // Auto-cleanup setting: { enabled, hours: 0=direct,1,4,10 }
   const [autoClean, setAutoClean] = useState(false);
   const [autoCleanHours, setAutoCleanHours] = useState<0 | 1 | 4 | 10>(1);
+  const [syncState, setSyncState] = useState<OnlineSync>({
+    registered: false,
+    syncEnabled: false,
+    lastSync: null,
+  });
+  const [syncing, setSyncing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -109,11 +128,89 @@ export default function SettingsScreen() {
           setAutoCleanHours(s.hours ?? 1);
         }
       });
+      AsyncStorage.getItem(SYNC_KEY).then((raw) => {
+        if (raw) setSyncState(JSON.parse(raw));
+      });
     }, [])
   );
 
   const saveAutoClean = async (enabled: boolean, hours: 0 | 1 | 4 | 10) => {
     await AsyncStorage.setItem("chat_cleanup_v1", JSON.stringify({ enabled, hours }));
+  };
+
+  const saveSyncState = async (next: OnlineSync) => {
+    setSyncState(next);
+    await AsyncStorage.setItem(SYNC_KEY, JSON.stringify(next));
+  };
+
+  const handleOpenRegister = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL(`${WEB_BASE}/register`);
+  };
+
+  const handleConfirmRegistered = () => {
+    Alert.prompt(
+      "E-mailadres bevestigen",
+      "Voer het e-mailadres in waarmee je je hebt aangemeld.",
+      [
+        { text: "Annuleer", style: "cancel" },
+        {
+          text: "Bevestigen",
+          onPress: (email: string | undefined) => {
+            if (!email || !email.includes("@")) {
+              Alert.alert("Ongeldig e-mailadres");
+              return;
+            }
+            saveSyncState({ ...syncState, registered: true, email: email.trim(), syncEnabled: true });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ],
+      "plain-text"
+    );
+  };
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const deviceId = profile?.id ?? "me_static_001";
+      const flightsRaw = await AsyncStorage.getItem("my_flights_v1");
+      const localFlights: RegisteredFlight[] = flightsRaw ? JSON.parse(flightsRaw) : [];
+      for (const f of localFlights) {
+        await fetch(`${API_BASE}/flights/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            flightNumber: f.flightNumber,
+            flightDate: f.flightDate,
+            seatNumber: f.seatNumber,
+            deviceId,
+            displayName: profile?.name,
+          }),
+        }).catch(() => null);
+      }
+      const ratingsRaw = await AsyncStorage.getItem("flight_ratings_v1");
+      if (ratingsRaw) {
+        const ratingsMap: Record<string, number> = JSON.parse(ratingsRaw);
+        for (const [flightNumber, rating] of Object.entries(ratingsMap)) {
+          const iataCode = flightNumber.replace(/\d+.*$/, "");
+          await fetch(`${API_BASE}/flights/rating`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ flightNumber, iataCode, rating, deviceId }),
+          }).catch(() => null);
+        }
+      }
+      const now = new Date().toISOString();
+      await saveSyncState({ ...syncState, lastSync: now });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleClearAllChats = () => {
@@ -430,6 +527,122 @@ export default function SettingsScreen() {
         />
       </View>
 
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Online Profiel</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {!syncState.registered ? (
+          <>
+            <View style={styles.syncPromoRow}>
+              <View style={[styles.syncPromoIcon, { backgroundColor: colors.primary + "22" }]}>
+                <Ionicons name="cloud-outline" size={24} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.syncPromoTitle, { color: colors.foreground }]}>
+                  Sync met online profiel
+                </Text>
+                <Text style={[styles.syncPromoSub, { color: colors.mutedForeground }]}>
+                  Sla je vluchten en ratings op in de cloud.
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.syncRegisterBtn,
+                { backgroundColor: pressed ? colors.primary + "cc" : colors.primary },
+              ]}
+              onPress={handleOpenRegister}
+            >
+              <Ionicons name="person-add-outline" size={16} color="#fff" />
+              <Text style={styles.syncRegisterBtnText}>Aanmelden via website</Text>
+            </Pressable>
+            <Pressable
+              style={styles.syncAlreadyLink}
+              onPress={handleConfirmRegistered}
+            >
+              <Text style={[styles.syncAlreadyText, { color: colors.primary }]}>
+                Al aangemeld? Koppel hier →
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <SettingRow
+              icon="cloud-done-outline"
+              iconColor={syncState.syncEnabled ? colors.success : colors.mutedForeground}
+              label="Online sync"
+              value={syncState.email}
+              right={
+                <Switch
+                  value={syncState.syncEnabled}
+                  onValueChange={(val) => {
+                    Haptics.selectionAsync();
+                    saveSyncState({ ...syncState, syncEnabled: val });
+                  }}
+                  trackColor={{ false: colors.muted, true: colors.success }}
+                  thumbColor="#ffffff"
+                />
+              }
+            />
+            {syncState.syncEnabled && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.settingRow,
+                    { backgroundColor: pressed ? colors.muted : colors.card },
+                  ]}
+                  onPress={handleSync}
+                  disabled={syncing}
+                >
+                  <View style={[styles.settingIcon, { backgroundColor: colors.success + "22" }]}>
+                    <Ionicons
+                      name={syncing ? "sync-outline" : "sync-outline"}
+                      size={20}
+                      color={syncing ? colors.mutedForeground : colors.success}
+                    />
+                  </View>
+                  <Text style={[styles.settingLabel, { color: syncing ? colors.mutedForeground : colors.foreground }]}>
+                    {syncing ? "Synchroniseren…" : "Nu synchroniseren"}
+                  </Text>
+                  {syncState.lastSync && !syncing && (
+                    <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>
+                      {new Date(syncState.lastSync).toLocaleString("nl-NL", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Pressable
+              style={styles.syncAlreadyLink}
+              onPress={() => {
+                Alert.alert(
+                  "Account ontkoppelen",
+                  "Wil je je online profiel loskoppelen van dit apparaat? Je data blijft bewaard op de server.",
+                  [
+                    { text: "Annuleer", style: "cancel" },
+                    {
+                      text: "Ontkoppelen",
+                      style: "destructive",
+                      onPress: () => saveSyncState({ registered: false, syncEnabled: false, lastSync: null }),
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={[styles.syncAlreadyText, { color: colors.destructive }]}>
+                Account ontkoppelen
+              </Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Privacy & Veiligheid</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow
@@ -594,4 +807,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   infoText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 20 },
+  syncPromoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+  },
+  syncPromoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  syncPromoTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
+  syncPromoSub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  syncRegisterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    margin: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  syncRegisterBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  syncAlreadyLink: { alignItems: "center", paddingVertical: 10, paddingBottom: 14 },
+  syncAlreadyText: { fontSize: 13, fontFamily: "Inter_500Medium" },
 });
