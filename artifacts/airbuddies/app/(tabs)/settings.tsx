@@ -76,7 +76,7 @@ function SettingRow({ icon, iconColor, label, value, onPress, danger, right }: S
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, toggleVisibility } = useApp();
+  const { profile, toggleVisibility, deleteAllConversations } = useApp();
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
 
@@ -84,14 +84,47 @@ export default function SettingsScreen() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // Auto-cleanup setting: { enabled, hours: 0=direct,1,4,10 }
+  const [autoClean, setAutoClean] = useState(false);
+  const [autoCleanHours, setAutoCleanHours] = useState<0 | 1 | 4 | 10>(1);
+
   useFocusEffect(
     useCallback(() => {
       AsyncStorage.getItem("my_flights_v1").then((raw) => {
         if (raw) setFlights(JSON.parse(raw));
         else setFlights([]);
       });
+      AsyncStorage.getItem("chat_cleanup_v1").then((raw) => {
+        if (raw) {
+          const s = JSON.parse(raw);
+          setAutoClean(s.enabled ?? false);
+          setAutoCleanHours(s.hours ?? 1);
+        }
+      });
     }, [])
   );
+
+  const saveAutoClean = async (enabled: boolean, hours: 0 | 1 | 4 | 10) => {
+    await AsyncStorage.setItem("chat_cleanup_v1", JSON.stringify({ enabled, hours }));
+  };
+
+  const handleClearAllChats = () => {
+    Alert.alert(
+      "Wis alle chats",
+      "Wil je echt alle chatgeschiedenis nu wissen? Dit kan niet ongedaan worden gemaakt.",
+      [
+        { text: "Annuleer", style: "cancel" },
+        {
+          text: "Wis alles",
+          style: "destructive",
+          onPress: () => {
+            deleteAllConversations();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          },
+        },
+      ]
+    );
+  };
 
   const flightKey = (f: RegisteredFlight) => `${f.flightNumber}_${f.flightDate}`;
 
@@ -281,6 +314,69 @@ export default function SettingsScreen() {
         />
       </View>
 
+      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Chats</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <SettingRow
+          icon="timer-outline"
+          iconColor={colors.primary}
+          label="Wis chats na landing"
+          right={
+            <Switch
+              value={autoClean}
+              onValueChange={(val) => {
+                Haptics.selectionAsync();
+                setAutoClean(val);
+                saveAutoClean(val, autoCleanHours);
+              }}
+              trackColor={{ false: colors.muted, true: colors.primary }}
+              thumbColor="#ffffff"
+            />
+          }
+        />
+        {autoClean && (
+          <>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={[styles.settingRow, { backgroundColor: colors.card }]}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.primary + "22" }]}>
+                <Ionicons name="time-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={[styles.settingLabel, { color: colors.foreground }]}>Na hoeveel uur?</Text>
+              <View style={styles.hourPicker}>
+                {([0, 1, 4, 10] as const).map((h) => (
+                  <Pressable
+                    key={h}
+                    style={[
+                      styles.hourChip,
+                      {
+                        backgroundColor: autoCleanHours === h ? colors.primary : colors.muted,
+                        borderColor: autoCleanHours === h ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setAutoCleanHours(h);
+                      saveAutoClean(autoClean, h);
+                    }}
+                  >
+                    <Text style={[styles.hourChipText, { color: autoCleanHours === h ? "#fff" : colors.mutedForeground }]}>
+                      {h === 0 ? "Direct" : `${h}u`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </>
+        )}
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <SettingRow
+          icon="trash-outline"
+          iconColor={colors.destructive}
+          label="Wis alle chats"
+          danger
+          onPress={handleClearAllChats}
+        />
+      </View>
+
       <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Privacy & Veiligheid</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SettingRow
@@ -366,6 +462,17 @@ const styles = StyleSheet.create({
   profileBio: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
   interestRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
   moreInterests: { fontSize: 12, fontFamily: "Inter_400Regular", alignSelf: "center" },
+  hourPicker: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  hourChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  hourChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   seatEditRow: {
     flexDirection: "row",
     alignItems: "center",

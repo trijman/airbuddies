@@ -248,7 +248,7 @@ function FlightInfoCard({ info, onConfirm, onCancel }: {
 export default function MyFlightsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, createGroup, setActiveAirlineIata } = useApp();
+  const { profile, createGroup, setActiveAirlineIata, conversations, deleteConversationsByFlightNumber } = useApp();
   const [seatModalVisible, setSeatModalVisible] = useState(false);
   const [pendingSeatFlight, setPendingSeatFlight] = useState<RegisteredFlight | null>(null);
   const [seatInput, setSeatInput] = useState("");
@@ -454,6 +454,23 @@ export default function MyFlightsScreen() {
             );
             await saveRegisteredFlights(updated);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+            // Offer to delete flight chat if one exists
+            const flightChat = conversations.find((c) => c.flightNumber === flight.flightNumber);
+            if (flightChat) {
+              Alert.alert(
+                "Vluchtchat verwijderen?",
+                `Wil je ook de chat van vlucht ${flight.flightNumber} verwijderen?`,
+                [
+                  { text: "Bewaar chat", style: "cancel" },
+                  {
+                    text: "Verwijder chat",
+                    style: "destructive",
+                    onPress: () => deleteConversationsByFlightNumber(flight.flightNumber),
+                  },
+                ]
+              );
+            }
 
             // Recalculate active airline after unregistering
             if (!updated.length) {
