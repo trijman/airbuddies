@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
   Alert,
@@ -89,6 +90,7 @@ export default function EditProfileScreen() {
   const [age, setAge] = useState(profile?.age?.toString() ?? "");
   const [gender, setGender] = useState(profile?.gender ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
+  const [avatarUri, setAvatarUri] = useState(profile?.avatarUri ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [instagram, setInstagram] = useState(profile?.instagram ?? "");
@@ -96,6 +98,30 @@ export default function EditProfileScreen() {
 
   const topPad = isWeb ? 67 : insets.top;
   const bottomPad = isWeb ? 34 : insets.bottom;
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Toegang nodig", "Geef toegang tot je fotobibliotheek om een profielfoto in te stellen.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
+
+  const removePhoto = () => {
+    Alert.alert("Foto verwijderen", "Wil je je profielfoto verwijderen?", [
+      { text: "Annuleer", style: "cancel" },
+      { text: "Verwijder", style: "destructive", onPress: () => setAvatarUri("") },
+    ]);
+  };
 
   const toggleInterest = (interest: string) => {
     Haptics.selectionAsync();
@@ -115,6 +141,7 @@ export default function EditProfileScreen() {
       age: age ? parseInt(age, 10) : undefined,
       gender: gender || undefined,
       bio: bio.trim() || undefined,
+      avatarUri: avatarUri || undefined,
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
       instagram: instagram.trim() || undefined,
@@ -152,14 +179,28 @@ export default function EditProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.avatarSection}>
-          <Avatar
-            name={name || "?"}
-            size={80}
-            seed={profile?.avatarSeed ?? name}
-          />
-          <Text style={[styles.avatarHint, { color: colors.mutedForeground }]}>
-            Avatar wordt gegenereerd op basis van naam
-          </Text>
+          <Pressable onPress={pickPhoto} style={styles.avatarWrap}>
+            <Avatar
+              name={name || "?"}
+              size={80}
+              seed={profile?.avatarSeed ?? name}
+              uri={avatarUri || undefined}
+            />
+            <View style={[styles.avatarEditBadge, { backgroundColor: colors.primary }]}>
+              <Ionicons name="camera" size={14} color="#fff" />
+            </View>
+          </Pressable>
+          {avatarUri ? (
+            <Pressable onPress={removePhoto}>
+              <Text style={[styles.avatarHint, { color: "#ef4444" }]}>
+                Foto verwijderen
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={[styles.avatarHint, { color: colors.mutedForeground }]}>
+              Tik om een foto te kiezen
+            </Text>
+          )}
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -266,6 +307,19 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 0 },
   avatarSection: { alignItems: "center", paddingVertical: 20, gap: 8 },
   avatarHint: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  avatarWrap: { position: "relative" },
+  avatarEditBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   section: {
     borderRadius: 14,
     borderWidth: 1,

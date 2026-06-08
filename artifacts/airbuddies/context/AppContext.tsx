@@ -104,6 +104,7 @@ export interface UserProfile {
   bio?: string;
   interests: string[];
   seatNumber?: string;
+  avatarUri?: string;
   phone?: string;
   email?: string;
   instagram?: string;

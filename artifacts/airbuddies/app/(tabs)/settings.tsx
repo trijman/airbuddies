@@ -211,7 +211,7 @@ export default function SettingsScreen() {
         onPress={() => router.push("/edit-profile")}
         testID="profile-edit-button"
       >
-        <Avatar name={profile?.name ?? "Ik"} size={64} seed={profile?.avatarSeed ?? profile?.name} />
+        <Avatar name={profile?.name ?? "Ik"} size={64} seed={profile?.avatarSeed ?? profile?.name} uri={profile?.avatarUri} />
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: colors.foreground }]}>
             {profile?.name ?? "Mijn profiel"}
