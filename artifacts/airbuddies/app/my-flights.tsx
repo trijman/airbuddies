@@ -454,6 +454,21 @@ export default function MyFlightsScreen() {
             );
             await saveRegisteredFlights(updated);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+            // Recalculate active airline after unregistering
+            if (!updated.length) {
+              setActiveAirlineIata(null);
+            } else {
+              const now = new Date();
+              const sorted = [...updated].sort((a, b) => {
+                const aT = a.flightInfo?.scheduledDeparture ?? `${a.flightDate}T23:59:59`;
+                const bT = b.flightInfo?.scheduledDeparture ?? `${b.flightDate}T23:59:59`;
+                return aT.localeCompare(bT);
+              });
+              const next = sorted.find((f) => new Date(f.flightInfo?.scheduledDeparture ?? `${f.flightDate}T23:59:59`) > now)
+                ?? sorted[sorted.length - 1];
+              setActiveAirlineIata(next?.flightInfo?.iataCode ?? next?.flightNumber?.slice(0, 2).toUpperCase() ?? null);
+            }
           },
         },
       ]

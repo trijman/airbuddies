@@ -199,7 +199,7 @@ const GAMES = [
 export default function AirlineScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { conversations, profile } = useApp();
+  const { conversations, profile, createGroup } = useApp();
   const [activeSection, setActiveSection] = useState<Section>("vlucht");
   const [orderItems, setOrderItems] = useState<string[]>([]);
   const [activeFlight, setActiveFlight] = useState<RegisteredFlight | null>(null);
@@ -208,7 +208,23 @@ export default function AirlineScreen() {
   const isWeb = Platform.OS === "web";
   const topPad = isWeb ? 67 : insets.top;
 
-  const flightConv = conversations.find((c) => !!c.flightNumber);
+  const flightConv = activeFlight
+    ? conversations.find((c) => c.flightNumber === activeFlight.flightNumber)
+    : null;
+
+  const handleOpenFlightChat = () => {
+    if (!activeFlight) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (flightConv) {
+      router.push(`/chat/${flightConv.id}`);
+    } else {
+      const conv = createGroup(`${activeFlight.flightNumber} ✈`, [], {
+        isPrivate: false,
+        flightNumber: activeFlight.flightNumber,
+      });
+      router.push(`/chat/${conv.id}`);
+    }
+  };
 
   // ─── Load active flight ───────────────────────────────────────────────────
   const loadActiveFlight = useCallback(async () => {
@@ -471,14 +487,14 @@ export default function AirlineScreen() {
               </View>
             )}
 
-            {flightConv && (
+            {activeFlight && (
               <Pressable
                 style={[styles.chatCta, { backgroundColor: brand.primaryColor }]}
-                onPress={() => router.push(`/chat/${flightConv.id}`)}
+                onPress={handleOpenFlightChat}
               >
                 <Ionicons name="chatbubbles" size={20} color={brand.textColor} />
                 <Text style={[styles.chatCtaText, { color: brand.textColor }]}>
-                  Open vluchtchat · {flightConv.participantIds.length} passagiers
+                  Open vluchtchat{flightConv ? ` · ${flightConv.participantIds.length} passagiers` : ""}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={brand.textColor + "99"} />
               </Pressable>
