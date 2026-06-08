@@ -287,10 +287,11 @@ export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, muteConversation, leaveGroup, deleteMessage } = useApp();
+  const { conversations, messages, profile, buddies, sendMessage, sendMediaMessage, sendContactCard, markAsRead, clearChatHistory, deleteConversation, transferAdmin, muteConversation, leaveGroup, deleteMessage } = useApp();
   const [input, setInput] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showAdminPicker, setShowAdminPicker] = useState(false);
   const [seatGate, setSeatGate] = useState(false);
   const [gateInput, setGateInput] = useState("");
   const [savingGate, setSavingGate] = useState(false);
@@ -498,18 +499,22 @@ export default function ChatScreen() {
       {
         text: "Verwijder gesprek",
         style: "destructive",
-        onPress: () =>
-          Alert.alert("Verwijder gesprek", "Wil je dit gesprek verwijderen? Dit kan niet ongedaan worden gemaakt.", [
-            { text: "Annuleer", style: "cancel" },
-            {
-              text: "Verwijder",
-              style: "destructive",
-              onPress: () => {
-                deleteConversation(id ?? "");
-                router.back();
+        onPress: () => {
+          const amAdmin = isGroup && conv?.adminId === profile?.id;
+          const otherMembers = conv?.participantIds.filter((pid) => pid !== profile?.id) ?? [];
+          if (amAdmin && otherMembers.length > 0) {
+            setShowAdminPicker(true);
+          } else {
+            Alert.alert("Verwijder gesprek", "Wil je dit gesprek verwijderen? Dit kan niet ongedaan worden gemaakt.", [
+              { text: "Annuleer", style: "cancel" },
+              {
+                text: "Verwijder",
+                style: "destructive",
+                onPress: () => { deleteConversation(id ?? ""); router.back(); },
               },
-            },
-          ]),
+            ]);
+          }
+        },
       },
     ];
 
@@ -772,6 +777,90 @@ export default function ChatScreen() {
         />
       )}
 
+      {/* Admin transfer picker */}
+      <Modal
+        visible={showAdminPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAdminPicker(false)}
+      >
+        <Pressable style={styles.adminPickerOverlay} onPress={() => setShowAdminPicker(false)}>
+          <Pressable style={[styles.adminPickerSheet, { backgroundColor: colors.card }]} onPress={() => {}}>
+            <View style={[styles.adminPickerHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.adminPickerTitle, { color: colors.foreground }]}>Kies nieuwe beheerder</Text>
+            <Text style={[styles.adminPickerSub, { color: colors.mutedForeground }]}>
+              Wie wordt beheerder nadat jij het gesprek verlaat?
+            </Text>
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              {(conv?.participantIds ?? [])
+                .filter((pid) => pid !== profile?.id)
+                .map((pid) => {
+                  const buddy = buddies.find((b) => b.id === pid);
+                  const name = buddy?.name ?? "Deelnemer";
+                  return (
+                    <Pressable
+                      key={pid}
+                      style={[styles.adminPickerRow, { borderBottomColor: colors.border }]}
+                      onPress={() => {
+                        setShowAdminPicker(false);
+                        Alert.alert(
+                          "Beheerder overdragen",
+                          `${name} wordt de nieuwe beheerder. Daarna wordt het gesprek verwijderd uit jouw lijst.`,
+                          [
+                            { text: "Annuleer", style: "cancel" },
+                            {
+                              text: "Overdragen & verwijderen",
+                              style: "destructive",
+                              onPress: () => {
+                                transferAdmin(id ?? "", pid);
+                                deleteConversation(id ?? "");
+                                router.back();
+                              },
+                            },
+                          ]
+                        );
+                      }}
+                    >
+                      <Avatar seed={buddy?.id ?? pid} name={name} size={36} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.adminPickerName, { color: colors.foreground }]}>{name}</Text>
+                        {buddy?.seatNumber && (
+                          <Text style={[styles.adminPickerSeat, { color: colors.mutedForeground }]}>
+                            Stoel {buddy.seatNumber}
+                          </Text>
+                        )}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            <Pressable
+              style={[styles.adminPickerSkip, { borderTopColor: colors.border }]}
+              onPress={() => {
+                setShowAdminPicker(false);
+                Alert.alert(
+                  "Verwijder gesprek",
+                  "Wil je het gesprek verwijderen zonder een nieuwe beheerder te kiezen?",
+                  [
+                    { text: "Annuleer", style: "cancel" },
+                    {
+                      text: "Verwijder",
+                      style: "destructive",
+                      onPress: () => { deleteConversation(id ?? ""); router.back(); },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={[styles.adminPickerSkipText, { color: colors.mutedForeground }]}>
+                Sla over — verwijder zonder overdracht
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Fullscreen image lightbox */}
       <Modal
         visible={!!lightboxUri}
@@ -1032,4 +1121,55 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   seatGateBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  adminPickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  adminPickerSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
+    paddingBottom: 32,
+  },
+  adminPickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  adminPickerTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    marginBottom: 4,
+    paddingHorizontal: 20,
+  },
+  adminPickerSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    paddingHorizontal: 24,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  adminPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  adminPickerName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  adminPickerSeat: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  adminPickerSkip: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+  },
+  adminPickerSkipText: { fontSize: 14, fontFamily: "Inter_400Regular" },
 });
