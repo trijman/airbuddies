@@ -1,0 +1,65 @@
+Run npx eas-cli@latest build --profile preview --platform ios --non-interactive
+npm warn exec The following package was not found and will be installed: eas-cli@20.1.0
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+npm warn deprecated @xmldom/xmldom@0.7.13: this version has critical issues, please update to the latest version
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@6.0.4: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated tar@7.5.7: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Resolved "preview" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "preview" environment on EAS.
+
+app.json is missing ios.infoPlist.ITSAppUsesNonExemptEncryption boolean. Manual configuration is required in App Store Connect before the app can be tested.
+
+
+✔ Using remote iOS credentials (Expo server)
+
+Distribution Certificate is not validated for non-interactive builds.
+Skipping Provisioning Profile validation on Apple Servers because we aren't authenticated.
+
+Project Credentials Configuration
+
+Project                   @trijman/airbuddies
+Bundle Identifier         com.airbuddies.app
+                          
+Ad Hoc Configuration      
+                          
+Distribution Certificate  
+Serial Number             618D0928AC047A39D5A182D47121D0AB
+Expiration Date           Tue, 08 Jun 2027 18:36:28 UTC
+Apple Team                72CS7BMND3 (Martijn Dijkstra (Individual))
+Updated                   2 hours ago
+                          
+Provisioning Profile      
+Developer Portal ID       7ZLGZGCXYN
+Status                    active
+Expiration                Tue, 08 Jun 2027 18:36:28 UTC
+Apple Team                72CS7BMND3 (Martijn Dijkstra (Individual))
+Provisioned devices       - iPhone (UDID: 00008140-000609222813C01C)
+Updated                   2 hours ago
+                          
+All credentials are ready to build @trijman/airbuddies (com.airbuddies.app)
+
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Uploading to EAS Build (0 / 7.8 MB)
+✔ Uploaded to EAS 
+- Computing project fingerprint
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/trijman/projects/airbuddies/builds/d4834e32-dc24-446f-bb7a-d04a877b0e59
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+- Waiting for build to complete.
+✖ Build failed
+
+🍏 iOS build failed:
+Unknown error. See logs of the Install dependencies build phase for more information.
+Error: Process completed with exit code 1.
