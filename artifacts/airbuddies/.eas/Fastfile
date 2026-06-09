@@ -9,7 +9,7 @@ platform :ios do
       output_directory: ".",
       output_name: "Airbuddies",
       export_method: "ad-hoc",
-      xcargs: "-allowProvisioningUpdates"
+      xcargs: "CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates"
     )
   end
 end
