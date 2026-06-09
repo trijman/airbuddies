@@ -282,12 +282,22 @@ for ln in content.splitlines():
     if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
         print(" ", ln.strip())
 
-# a) Replace "iPhone Developer" identity -> "-" (any cert matching profile)
+# a) Replace "iPhone Developer" identity -> "Apple Distribution" (modern cert name)
+CERT_IDENTITY = "Apple Distribution"
 OLD_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";'
-NEW_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "-";'
+NEW_ID = f'"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{CERT_IDENTITY}";'
 n = content.count(OLD_ID)
 content = content.replace(OLD_ID, NEW_ID)
 print(f"Replaced {n} CODE_SIGN_IDENTITY[sdk=iphoneos*] occurrences")
+
+# a2) Also add base CODE_SIGN_IDENTITY = "Apple Distribution" if absent
+BASE_ID_LINE = f'CODE_SIGN_IDENTITY = "{CERT_IDENTITY}";'
+if BASE_ID_LINE not in content:
+    content = content.replace(
+        "CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = " + TEAM_ID + ";",
+        f"CODE_SIGN_IDENTITY = \"{CERT_IDENTITY}\";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = " + TEAM_ID + ";"
+    )
+    print("Inserted base CODE_SIGN_IDENTITY")
 
 # b) Add CODE_SIGN_STYLE = Manual
 if "CODE_SIGN_STYLE = Automatic;" in content:
@@ -326,7 +336,8 @@ for ln in content.splitlines():
     if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
         print(" ", ln.strip())
 
-print(f"\nManual:  {content.count('CODE_SIGN_STYLE = Manual;')}")
-print(f'"-" id:  {content.count(NEW_ID)}')
-print(f"UUID:    {'YES' if PROFILE_UUID in content else 'NO'}")
+print(f"\nManual:     {content.count('CODE_SIGN_STYLE = Manual;')}")
+print(f"AppleDist:  {content.count(NEW_ID)}")
+print(f"BaseCert:   {content.count(BASE_ID_LINE)}")
+print(f"UUID:       {'YES' if PROFILE_UUID in content else 'NO'}")
 print("=== Done ===")
