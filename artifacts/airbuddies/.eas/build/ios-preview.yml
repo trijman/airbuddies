@@ -4,35 +4,27 @@ build:
     - eas/checkout
     - run:
         name: Remove incompatible lockfile
-        command: rm -f ../../pnpm-lock.yaml && echo "Deleted" || true
+        command: rm -f ../../pnpm-lock.yaml || true
     - run:
-        name: Strip expo-dev-client (not needed for distribution builds)
+        name: Strip expo-dev-client (not needed for distribution)
         command: |
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.dependencies['expo-dev-client'];fs.writeFileSync('package.json',JSON.stringify(p,null,2));console.log('expo-dev-client removed');"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
     - run:
-        name: Expo prebuild (includes pod install)
+        name: Expo prebuild
         command: pnpm exec expo prebuild --clean --platform ios
     - run:
-        name: Post-prebuild sync
+        name: Post-prebuild install
         command: |
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Patch signing and install Fastfile
+        name: Install Fastfile (overrides signing via xcargs)
         command: |
-          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          echo "=== Bundle IDs ==="
-          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | sort -u
-          echo "=== CODE_SIGN_STYLE before ==="
-          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
-          python3 -c "f='ios/Airbuddies.xcodeproj/project.pbxproj';c=open(f).read();cnt=c.count('CODE_SIGN_STYLE = Manual');open(f,'w').write(c.replace('CODE_SIGN_STYLE = Manual','CODE_SIGN_STYLE = Automatic'));print('Replaced',cnt,'occurrences')"
-          echo "=== CODE_SIGN_STYLE after ==="
-          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
           mkdir -p ios/fastlane
           cp .eas/Fastfile ios/fastlane/Fastfile
-          echo "=== Fastfile installed ==="
+          echo "Fastfile ready:"
           cat ios/fastlane/Fastfile
     - eas/run_fastlane
