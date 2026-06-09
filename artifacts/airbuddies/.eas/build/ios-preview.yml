@@ -1,0 +1,18 @@
+build:
+  name: iOS Preview (no frozen lockfile)
+  steps:
+    - eas/checkout
+    - eas/install_node_modules:
+        inputs:
+          install_command: pnpm install --no-frozen-lockfile
+    - eas/resolve_apple_team_id_from_credentials:
+        inputs:
+          apple_team_id: ${ eas.job.credentials.distributionCertificate.appleTeamIdentifier }
+    - eas/prebuild:
+        inputs:
+          clean: true
+    - eas/install_pods
+    - eas/run_fastlane
+    - eas/upload_artifact:
+        inputs:
+          path: /Users/expo/workingdir/build/ios/build/AirBuddies.ipa
