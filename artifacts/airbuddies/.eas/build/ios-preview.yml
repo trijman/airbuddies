@@ -19,6 +19,7 @@ build:
     - eas/prebuild:
         inputs:
           clean: true
+          no_install: true
     - run:
         name: Post-prebuild reinstall
         command: |
