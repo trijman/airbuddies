@@ -17,7 +17,8 @@
       "credentialsSource": "remote",
       "config": "ios-preview.yml",
       "ios": {
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "artifactPath": "ios/Airbuddies.ipa"
       }
     },
     "production": {
