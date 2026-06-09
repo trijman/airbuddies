@@ -319,6 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           timestamp: msg.timestamp,
           status: "delivered",
           type: (msg.type as Message["type"]) ?? "text",
+          ...(msg.contactData ? { contactData: msg.contactData } : {}),
         };
 
         setMessages((prev) => {
@@ -402,22 +403,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
 
       const conv = conversations.find((c) => c.id === conversationId);
-      const recipientId = conv?.type === "direct"
-        ? conv.participantIds.find((id) => id !== currentProfile.id)
-        : undefined;
+      const bleMsg: AirbuddiesMessage = {
+        fromId: currentProfile.id,
+        content,
+        timestamp: newMsg.timestamp,
+        conversationId,
+        type: "text",
+      };
 
-      if (recipientId) {
-        const bleMsg: AirbuddiesMessage = {
-          fromId: currentProfile.id,
-          content,
-          timestamp: newMsg.timestamp,
-          conversationId,
-          type: "text",
-        };
-        const delivered = await bleService.sendMessageViaBLE(recipientId, bleMsg);
-        updateStatus(delivered ? "delivered" : "sent");
+      if (conv?.type === "direct") {
+        const recipientId = conv.participantIds.find((id) => id !== currentProfile.id);
+        if (recipientId) {
+          const delivered = await bleService.sendMessageViaBLE(recipientId, bleMsg);
+          updateStatus(delivered ? "delivered" : "sent");
+        } else {
+          updateStatus("sent");
+        }
+      } else if (conv?.type === "group") {
+        const recipients = conv.participantIds.filter((id) => id !== currentProfile.id);
+        const results = await Promise.all(
+          recipients.map((rid) => bleService.sendMessageViaBLE(rid, bleMsg))
+        );
+        updateStatus(results.some(Boolean) ? "delivered" : "sent");
       } else {
-        setTimeout(() => updateStatus("sent"), 500);
+        updateStatus("sent");
       }
     },
     [conversations]
@@ -453,20 +462,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveConversations(updated);
         return updated;
       });
-      setTimeout(() => {
+
+      const conv = conversations.find((c) => c.id === conversationId);
+      const bleMsg: AirbuddiesMessage = {
+        fromId: currentProfile.id,
+        content: label,
+        timestamp: newMsg.timestamp,
+        conversationId,
+        type: attachment.type as AirbuddiesMessage["type"],
+      };
+
+      const updateStatus = (status: MessageStatus) => {
         setMessages((prev) => {
           const updated = {
             ...prev,
             [conversationId]: (prev[conversationId] ?? []).map((m) =>
-              m.id === newMsg.id ? { ...m, status: "sent" as MessageStatus } : m
+              m.id === newMsg.id ? { ...m, status } : m
             ),
           };
           saveMessages(updated);
           return updated;
         });
-      }, 700);
+      };
+
+      if (conv?.type === "direct") {
+        const recipientId = conv.participantIds.find((id) => id !== currentProfile.id);
+        if (recipientId) {
+          const delivered = await bleService.sendMessageViaBLE(recipientId, bleMsg);
+          updateStatus(delivered ? "delivered" : "sent");
+        } else {
+          updateStatus("sent");
+        }
+      } else if (conv?.type === "group") {
+        const recipients = conv.participantIds.filter((id) => id !== currentProfile.id);
+        const results = await Promise.all(
+          recipients.map((rid) => bleService.sendMessageViaBLE(rid, bleMsg))
+        );
+        updateStatus(results.some(Boolean) ? "delivered" : "sent");
+      } else {
+        updateStatus("sent");
+      }
     },
-    []
+    [conversations]
   );
 
   const sendContactCard = useCallback(
@@ -500,20 +537,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         saveConversations(updated);
         return updated;
       });
-      setTimeout(() => {
+
+      const conv = conversations.find((c) => c.id === conversationId);
+      const bleMsg: AirbuddiesMessage = {
+        fromId: currentProfile.id,
+        content: cardMsg.content,
+        timestamp: cardMsg.timestamp,
+        conversationId,
+        type: "contact-card",
+        contactData: cardMsg.contactData,
+      };
+
+      const updateCardStatus = (status: MessageStatus) => {
         setMessages((prev) => {
           const updated = {
             ...prev,
             [conversationId]: (prev[conversationId] ?? []).map((m) =>
-              m.id === cardMsg.id ? { ...m, status: "sent" as MessageStatus } : m
+              m.id === cardMsg.id ? { ...m, status } : m
             ),
           };
           saveMessages(updated);
           return updated;
         });
-      }, 600);
+      };
+
+      if (conv?.type === "direct") {
+        const recipientId = conv.participantIds.find((id) => id !== currentProfile.id);
+        if (recipientId) {
+          const delivered = await bleService.sendMessageViaBLE(recipientId, bleMsg);
+          updateCardStatus(delivered ? "delivered" : "sent");
+        } else {
+          updateCardStatus("sent");
+        }
+      } else if (conv?.type === "group") {
+        const recipients = conv.participantIds.filter((id) => id !== currentProfile.id);
+        const results = await Promise.all(
+          recipients.map((rid) => bleService.sendMessageViaBLE(rid, bleMsg))
+        );
+        updateCardStatus(results.some(Boolean) ? "delivered" : "sent");
+      } else {
+        updateCardStatus("sent");
+      }
     },
-    []
+    [conversations]
   );
 
   const addBuddy = useCallback(

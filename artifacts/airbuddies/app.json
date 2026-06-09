@@ -20,7 +20,8 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Airbuddies gebruikt Bluetooth om andere passagiers op jouw vlucht te ontdekken en berichten uit te wisselen zonder internet.",
         "NSBluetoothPeripheralUsageDescription": "Airbuddies gebruikt Bluetooth om andere passagiers op jouw vlucht te ontdekken en berichten uit te wisselen zonder internet.",
-        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"]
+        "UIBackgroundModes": ["bluetooth-central", "bluetooth-peripheral"],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

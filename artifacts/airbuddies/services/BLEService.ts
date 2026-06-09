@@ -25,7 +25,13 @@ export interface AirbuddiesMessage {
   content: string;
   timestamp: number;
   conversationId: string;
-  type?: "text" | "system";
+  type?: "text" | "system" | "image" | "document" | "audio" | "contact-card";
+  contactData?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    instagram?: string;
+  };
 }
 
 type DeviceFoundCb = (profile: AirbuddiesProfile, rssi: number) => void;
