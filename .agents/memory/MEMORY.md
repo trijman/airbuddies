@@ -1,2 +1,4 @@
 - [Airbuddies onboarding routing](airbuddies-onboarding.md) — onboarding check lives in AppContext; redirect in RootLayoutNav via useEffect; key is `onboarding_done_v1`
 - [Airbuddies api-zod conflict](airbuddies-api-zod.md) — after codegen, api-zod/src/index.ts must only export `./generated/api`, NOT `./generated/types` (duplicate name clash)
+- [Airbuddies EAS build – worklets peer dep](airbuddies-eas-worklets.md) — react-native-worklets is a required peer of reanimated 4.x; DO NOT remove it from package.json
+- [Airbuddies EAS darwin overrides](airbuddies-eas-darwin.md) — pnpm-workspace.yaml excludes darwin binaries for esbuild/rollup/etc; EAS macOS workers rely on fingerprint cache to survive; cold builds will fail until those overrides are removed
