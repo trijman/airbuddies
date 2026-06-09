@@ -6,7 +6,7 @@ build:
         name: Remove incompatible lockfile
         command: |
           echo "=== PWD: $PWD ==="
-          rm -f ../../pnpm-lock.yaml && echo "Deleted ../../pnpm-lock.yaml" || echo "No lockfile found"
+          rm -f ../../pnpm-lock.yaml && echo "Deleted" || echo "No lockfile found"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
@@ -19,27 +19,29 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Create diagnostic Fastfile to inspect EAS signing setup
+        name: Create diagnostic Fastfile
         command: |
           mkdir -p ios/fastlane
-          cat > ios/fastlane/Fastfile << 'HEREDOC'
-default_platform(:ios)
-platform :ios do
-  lane :default do
-    puts "=== PROVISIONING PROFILES ==="
-    sh("ls -la \"$HOME/Library/MobileDevice/Provisioning Profiles/\" 2>/dev/null || echo 'none installed'")
-    puts "=== CODESIGNING IDENTITIES ==="
-    sh("security find-identity -v -p codesigning 2>/dev/null || echo 'none'")
-    puts "=== KEYCHAIN LIST ==="
-    sh("security list-keychains 2>/dev/null || echo 'none'")
-    puts "=== GEM LIST ==="
-    sh("gem list 2>/dev/null | grep -iE '(expo|signing|match|cert|sigh)' || echo 'no relevant gems'")
-    puts "=== ENV CREDENTIAL VARS ==="
-    sh("env | grep -iE '(CERT|PROV|P12|PROFILE|SIGN|APPLE|TEAM|MATCH)' | sed 's/=.*/=[REDACTED]/' || echo 'none'")
-    puts "=== DIAGNOSIS COMPLETE ==="
-  end
-end
-HEREDOC
-          echo "=== Diagnostic Fastfile created ==="
+          python3 -c "
+          content = '''default_platform(:ios)
+          platform :ios do
+            lane :default do
+              puts \"=== PROVISIONING PROFILES ===\"
+              sh(\"ls -la \\\\\"$HOME/Library/MobileDevice/Provisioning Profiles/\\\\\" 2>/dev/null || echo none\")
+              puts \"=== CODESIGNING IDENTITIES ===\"
+              sh(\"security find-identity -v -p codesigning 2>/dev/null || echo none\")
+              puts \"=== GEMS WITH SIGNING ===\"
+              sh(\"gem list 2>/dev/null | grep -iE (expo|signing|match|cert|sigh) || echo none\")
+              puts \"=== ENV CREDENTIAL VARS ===\"
+              sh(\"env | grep -iE (CERT|PROV|P12|PROFILE|SIGN|APPLE|TEAM|MATCH) | sed s/=.*/=REDACTED/ || echo none\")
+              puts \"=== DIAGNOSIS COMPLETE ===\"
+            end
+          end
+          '''
+          with open('ios/fastlane/Fastfile', 'w') as f:
+              f.write(content)
+          print('Fastfile written')
+          "
+          echo "=== Fastfile contents ==="
           cat ios/fastlane/Fastfile
     - eas/run_fastlane
