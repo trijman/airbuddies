@@ -22,26 +22,6 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Diagnose EAS credential environment
-        command: |
-          echo "=== env vars (keys only) ==="
-          env | grep -iE '(cert|p12|sign|apple|expo_apple|eas|keychain|fastlane|provision|distribution|identity)' | sed 's/=.*/=<hidden>/' | sort
-          echo ""
-          echo "=== ~/.fastlane/ ==="
-          ls -la ~/.fastlane/ 2>&1 || echo "(not found)"
-          echo ""
-          echo "=== /tmp cert-related files ==="
-          ls /tmp/*.p12 /tmp/*.cer /tmp/*.pem /tmp/*.mobileprovision 2>&1 || echo "(none)"
-          echo ""
-          echo "=== security list-keychains ==="
-          security list-keychains 2>&1
-          echo ""
-          echo "=== security find-identity ==="
-          security find-identity -v -p codesigning 2>&1 || true
-          echo ""
-          echo "=== Provisioning Profiles dir ==="
-          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" 2>&1 || echo "(empty/not found)"
-    - run:
-        name: Patch pbxproj - install profile + set distribution signing
+        name: Patch pbxproj - install cert + profile + set distribution signing
         command: python3 .eas/build/patch_signing.py
     - eas/run_fastlane
