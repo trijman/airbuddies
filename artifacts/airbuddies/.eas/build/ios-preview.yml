@@ -19,10 +19,33 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
+        name: Diagnose - credential env vars and signing gems
+        command: |
+          echo "=== Credential-related env vars ==="
+          python3 -c "
+          import os
+          for k, v in sorted(os.environ.items()):
+              if any(x in k.upper() for x in ['CERT','PROV','P12','PROFILE','SIGN','APPLE','EXPO','TEAM','EAS','DIST','KEYCHAIN']):
+                  val = v[:60] + '...' if len(v) > 60 else v
+                  print(f'{k}={val}')
+          " || echo "python failed"
+          echo ""
+          echo "=== All EAS_ vars ==="
+          env | grep "^EAS_" | sed 's/=.*/=<truncated>/' || echo "none"
+          echo ""
+          echo "=== expo signing gems ==="
+          gem list 2>/dev/null | grep -i expo || echo "no expo gems"
+          find /usr/local/lib /opt /var/lib -name "*expo_setup*" 2>/dev/null | head -5 || true
+          echo ""
+          echo "=== Installed provisioning profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null | head -10 || echo "none installed"
+          echo ""
+          echo "=== fastlane dir check ==="
+          ls -la ios/fastlane/ 2>/dev/null || echo "no ios/fastlane dir"
+    - run:
         name: Verify DEVELOPMENT_TEAM in pbxproj
         command: |
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          COUNT=$(grep -c "DEVELOPMENT_TEAM" "$PBXPROJ" || echo "0")
-          echo "DEVELOPMENT_TEAM entries: $COUNT"
-          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -5
+          echo "DEVELOPMENT_TEAM entries: $(grep -c 'DEVELOPMENT_TEAM' "$PBXPROJ")"
+          grep "DEVELOPMENT_TEAM\|CODE_SIGN_STYLE\|PROVISIONING_PROFILE" "$PBXPROJ" | head -10
     - eas/run_fastlane
