@@ -8,19 +8,7 @@ build:
     - run:
         name: Strip expo-dev-client (not needed for distribution builds)
         command: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            const removed = [];
-            ['expo-dev-client'].forEach(dep => {
-              if (pkg.dependencies && pkg.dependencies[dep]) {
-                delete pkg.dependencies[dep];
-                removed.push(dep);
-              }
-            });
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-            console.log('Removed from dependencies:', removed.join(', ') || 'none');
-          "
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.dependencies['expo-dev-client'];fs.writeFileSync('package.json',JSON.stringify(p,null,2));console.log('expo-dev-client removed');"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
@@ -33,24 +21,34 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Patch pbxproj - enable Automatic signing
+        name: Patch pbxproj and create Fastfile
         command: |
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          echo "=== BEFORE PATCH ==="
-          grep -n "CODE_SIGN_STYLE" "$PBXPROJ" || echo "(not found)"
-          echo "--- Bundle IDs in project ---"
+          echo "=== Bundle IDs ==="
           grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | sort -u
-          python3 - "$PBXPROJ" <<'PYEOF'
-          import sys
-          path = sys.argv[1]
-          with open(path, 'r') as f:
-              c = f.read()
-          count = c.count('CODE_SIGN_STYLE = Manual')
-          new_c = c.replace('CODE_SIGN_STYLE = Manual', 'CODE_SIGN_STYLE = Automatic')
-          with open(path, 'w') as f:
-              f.write(new_c)
-          print(f"Replaced {count} occurrence(s) of CODE_SIGN_STYLE = Manual")
-          PYEOF
-          echo "=== AFTER PATCH ==="
-          grep -n "CODE_SIGN_STYLE" "$PBXPROJ" || echo "(not found)"
+          echo "=== Signing before ==="
+          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
+          python3 -c "f='ios/Airbuddies.xcodeproj/project.pbxproj';c=open(f).read();cnt=c.count('CODE_SIGN_STYLE = Manual');open(f,'w').write(c.replace('CODE_SIGN_STYLE = Manual','CODE_SIGN_STYLE = Automatic'));print('Replaced',cnt,'occurrences')"
+          echo "=== Signing after ==="
+          grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
+          mkdir -p ios/fastlane
+          cat > ios/fastlane/Fastfile << 'FASTFILE_EOF'
+default_platform(:ios)
+
+platform :ios do
+  lane :build do
+    gym(
+      scheme: "Airbuddies",
+      project: "./Airbuddies.xcodeproj",
+      configuration: "Release",
+      output_directory: ".",
+      output_name: "Airbuddies",
+      export_method: "ad-hoc",
+      xcargs: "-allowProvisioningUpdates"
+    )
+  end
+end
+FASTFILE_EOF
+          echo "=== Fastfile created ==="
+          cat ios/fastlane/Fastfile
     - eas/run_fastlane
