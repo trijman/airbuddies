@@ -80,8 +80,7 @@ export default function NewGroupScreen() {
       flightNumber: flightNum,
     });
 
-    router.back();
-    router.push(`/chat/${newConv.id}`);
+    router.replace(`/chat/${newConv.id}`);
   };
 
   const stepTitle = step === 0
