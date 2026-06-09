@@ -308,56 +308,68 @@ with open(project_backup, "wb") as fh:
     fh.write(profile_data)
 print(f"Installed backup:  {project_backup} ({len(profile_data)} bytes)")
 
-# ── 1b. Install distribution certificate into keychain ────────────────────────
+# ── 1b. Install distribution certificate into a dedicated build keychain ──────
 print("\n=== Installing distribution certificate ===")
-KEYCHAIN = os.path.expanduser("~/Library/Keychains/login.keychain-db")
+BUILD_KC_PASS = "airbuddies-ci-build"
+BUILD_KC_NAME = "airbuddies-build.keychain-db"
+BUILD_KC = os.path.expanduser(f"~/Library/Keychains/{BUILD_KC_NAME}")
+
 p12_data = base64.b64decode(CERT_P12_B64)
 p12_path = "/tmp/airbuddies_dist.p12"
 with open(p12_path, "wb") as fh:
     fh.write(p12_data)
 print(f"p12 written ({len(p12_data)} bytes) → {p12_path}")
 
-# Unlock the keychain (EAS worker uses empty password)
-for kc_pass in ["", "test", "login"]:
-    r_unlock = subprocess.run(
-        ["security", "unlock-keychain", "-p", kc_pass, KEYCHAIN],
-        capture_output=True, text=True
-    )
-    if r_unlock.returncode == 0:
-        print(f"Keychain unlocked (password='{kc_pass}')")
-        break
-    print(f"unlock-keychain rc={r_unlock.returncode} ({kc_pass!r}): {r_unlock.stderr.strip()}")
+# Delete any leftover keychain from a previous attempt, then create fresh
+subprocess.run(["security", "delete-keychain", BUILD_KC], capture_output=True)
+r_create = subprocess.run(
+    ["security", "create-keychain", "-p", BUILD_KC_PASS, BUILD_KC],
+    capture_output=True, text=True
+)
+print(f"create-keychain rc={r_create.returncode} {r_create.stderr.strip()}")
 
-# Prevent auto-lock for 2 hours
-subprocess.run(["security", "set-keychain-settings", "-t", "7200", "-l", KEYCHAIN],
+# Prevent auto-lock
+subprocess.run(["security", "set-keychain-settings", "-t", "7200", "-l", BUILD_KC],
                capture_output=True)
 
-# Import the p12 — grant codesign + xcodebuild trust
+# Add build keychain to the user keychain search list (keep existing ones)
+r_list = subprocess.run(["security", "list-keychains", "-d", "user"],
+                        capture_output=True, text=True)
+existing_kcs = [ln.strip().strip('"') for ln in r_list.stdout.strip().splitlines() if ln.strip()]
+all_kcs = existing_kcs + [BUILD_KC]
+subprocess.run(["security", "list-keychains", "-d", "user", "-s"] + all_kcs,
+               capture_output=True)
+print(f"Keychain search list: {all_kcs}")
+
+# Import the p12 with -A (allow all apps) — avoids needing -T path lookup
 r_import = subprocess.run([
     "security", "import", p12_path,
-    "-k", KEYCHAIN,
+    "-k", BUILD_KC,
     "-P", CERT_P12_PASSWORD,
-    "-T", "/usr/bin/codesign",
-    "-T", "/usr/bin/xcodebuild",
-    "-T", "/Applications/Xcode.app/Contents/Developer/usr/bin/codesign",
-    "-t", "agg",  # allow key creation
+    "-A",           # allow access by all applications
+    "-t", "agg",    # accept certificates, keys, and arbitrary data
 ], capture_output=True, text=True)
 print(f"security import rc={r_import.returncode}")
 if r_import.stdout: print("  stdout:", r_import.stdout.strip())
 if r_import.stderr: print("  stderr:", r_import.stderr.strip())
 
-# Allow all Apple tools access without UI prompt (crucial for CI)
+# Allow Apple codesigning tools access without UI prompt (required for CI)
 r_partition = subprocess.run([
     "security", "set-key-partition-list",
-    "-S", "apple-tool:,apple:",
+    "-S", "apple-tool:,apple:,codesign:",
     "-s",
-    "-k", "",  # keychain password (empty)
-    KEYCHAIN,
+    "-k", BUILD_KC_PASS,
+    BUILD_KC,
 ], capture_output=True, text=True)
 print(f"set-key-partition-list rc={r_partition.returncode}")
 if r_partition.stderr: print("  stderr:", r_partition.stderr.strip()[:200])
 
-# Verify cert is accessible
+# Unlock and make default
+subprocess.run(["security", "unlock-keychain", "-p", BUILD_KC_PASS, BUILD_KC],
+               capture_output=True)
+subprocess.run(["security", "default-keychain", "-s", BUILD_KC], capture_output=True)
+
+# Verify cert is now visible as a valid signing identity
 r_verify = subprocess.run(
     ["security", "find-identity", "-v", "-p", "codesigning"],
     capture_output=True, text=True
