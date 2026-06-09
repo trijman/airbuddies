@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.airbuddies.app",
+      "appleTeamId": "72CS7BMND3",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Airbuddies gebruikt Bluetooth om andere passagiers op jouw vlucht te ontdekken en berichten uit te wisselen zonder internet.",
         "NSBluetoothPeripheralUsageDescription": "Airbuddies gebruikt Bluetooth om andere passagiers op jouw vlucht te ontdekken en berichten uit te wisselen zonder internet.",
