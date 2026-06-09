@@ -1,9 +1,69 @@
-import sys, os, base64, subprocess
+import sys, os, base64, subprocess, tempfile
 
 PBXPROJ = "ios/Airbuddies.xcodeproj/project.pbxproj"
 PROFILE_UUID = "342d4c3b-313c-4394-bd51-ee3d245a490d"
 TEAM_ID = "72CS7BMND3"
 PROFILES_DIR = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
+
+# Distribution cert (iPhone Distribution: Martijn Dijkstra (72CS7BMND3))
+# Serial: 618D0928AC047A39D5A182D47121D0AB, expires 2027-06-08
+CERT_P12_B64 = (
+    "MIIL8gIBAzCCC7gGCSqGSIb3DQEHAaCCC6kEggulMIILoTCCBkEGCSqGSIb3DQEHAaCCBjIEggYu"
+    "MIIGKjCCBiYGCyqGSIb3DQEMCgEDoIIF1zCCBdMGCiqGSIb3DQEJFgGgggXDBIIFvzCCBbswggSj"
+    "oAMCAQICEGGNCSisBHo51aGC1HEh0KswDQYJKoZIhvcNAQELBQAwdTFEMEIGA1UEAww7QXBwbGUg"
+    "V29ybGR3aWRlIERldmVsb3BlciBSZWxhdGlvbnMgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkxCzAJ"
+    "BgNVBAsMAkczMRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yNjA2MDgxODM2"
+    "MjlaFw0yNzA2MDgxODM2MjhaMIGWMRowGAYKCZImiZPyLGQBAQwKNzJDUzdCTU5EMzE7MDkGA1UE"
+    "AwwyaVBob25lIERpc3RyaWJ1dGlvbjogTWFydGlqbiBEaWprc3RyYSAoNzJDUzdCTU5EMykxEzAR"
+    "BgNVBAsMCjcyQ1M3Qk1ORDMxGTAXBgNVBAoMEE1hcnRpam4gRGlqa3N0cmExCzAJBgNVBAYTAlVT"
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyoUaqX5ar71jJTPRnYlROWSgomw48HF0"
+    "lfRpVLnCkavYGZoN1ZCn625+CGl+wGP+2/oqLaPLU3JL+fVqlEFw1rEIQVVwFlQPIGY8ssz2S8qD"
+    "17EwZKWJ+u9QCwEVREZXvUO+Cjt64VD5J8IvEj30KTMP3yhhI8zIt1WaZnI+V+kWucz3ksG0QRr2"
+    "FCtHDfm4wgEJZYAmiq18vIb7IueX1y78b3RMdx1hJ1AwYqx8a76UeIyDv8+R3Ye4Bo93VEiOt30u"
+    "F/Xr0m8rqIz8ihva7znRiw21rX6/cgv6rxjLFMFSHgLYZWYz7YWUCY9juMYlI4KV3HWUCRpc/hx"
+    "Z1HSRPQIDAQABo4ICIzCCAh8wDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBQJ/sAVkPmvZAqSErkm"
+    "KGMMl+ynsjBwBggrBgEFBQcBAQRkMGIwLQYIKwYBBQUHMAKGIWh0dHA6Ly9jZXJ0cy5hcHBsZS5j"
+    "b20vd3dkcmczLmRlcjAxBggrBgEFBQcwAYYlaHR0cDovL29jc3AuYXBwbGUuY29tL29jc3AwMy13"
+    "d2RyZzMwMjCCAR4GA1UdIASCARUwggERMIIBDQYJKoZIhvdjZAUBMIH/MIHDBggrBgEFBQcCAjCB"
+    "tgyBs1JlbGlhbmNlIG9uIHRoaXMgY2VydGlmaWNhdGUgYnkgYW55IHBhcnR5IGFzc3VtZXMgYWNj"
+    "ZXB0YW5jZSBvZiB0aGUgdGhlbiBhcHBsaWNhYmxlIHN0YW5kYXJkIHRlcm1zIGFuZCBjb25kaXRp"
+    "b25zIG9mIHVzZSwgY2VydGlmaWNhdGUgcG9saWN5IGFuZCBjZXJ0aWZpY2F0aW9uIHByYWN0aWNl"
+    "IHN0YXRlbWVudHMuMDcGCCsGAQUFBwIBFitodHRwczovL3d3dy5hcHBsZS5jb20vY2VydGlmaWNh"
+    "dGVhdXRob3JpdHkvMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMDMB0GA1UdDgQWBBRfXZpI2Fm1C6ot"
+    "uqkhlQhRm4w0jTAOBgNVHQ8BAf8EBAMCB4AwEwYKKoZIhvdjZAYBBAEB/wQCBQAwDQYJKoZIhvcN"
+    "AQELBQADggEBAIZ52vVHhgV/uW41cccotFDK4vWl4UJyQOu1FNGvM8AdWzj1wEXo+8rDCJ+qDy3G"
+    "DeiqYeOSBSgX67x8tTQqWAECv3GqD/AnNQ9HaBykjOTlrTCu1EtX5AVPPVzA7FcuFGjfhHg9VS+7"
+    "q/K5du7F6mcofXLPLvfF6Pp5T+JYFt6rT1KlAPujzQIWr4umfeTsjMLrK/Qh2vql7nb2SJjQJwZR"
+    "+8ZKc8MOKJLfmRHU6DmhGOCnycyPrIzHPczLldzDye2FU2R/19xWDCe61m2g/bM8BQFubN48AjDh"
+    "SlJ4ra/OhQ64NsTHNITwSEZxdVJVg7k9Bk9vRmBfygaNszsq5CUxPDAjBgkqhkiG9w0BCRUxFgQU"
+    "C+Gu+BSNEuMncIQbquj5KKJ2lXQwFQYJKoZIhvcNAQkUMQgeBgBrAGUAeTCCBVgGCSqGSIb3DQEH"
+    "AaCCBUkEggVFMIIFQTCCBT0GCyqGSIb3DQEMCgECoIIE7jCCBOowHAYKKoZIhvcNAQwBAzAOBAir"
+    "XDCvaPSIiwICCAAEggTIfZ/FNMkNT6SCTSFw8c7Fdzg36HCUxIdiLYlxpxAu2XGhBEGwQ3r03gGi"
+    "71oHlKgML12PqP8BHoVR1VviJNMMGtGfn9f9S5AUB5lsrZ590JbikFLyURdDm8YrdRJGbcQnOb2A"
+    "gs0+GKzrtz41HwfvBP2JG4yqK7MtfYcfG8pkkFcow8ZMzZbGLHm5UFFgtJH8Nkv4NyltZZc+sBC9"
+    "FJtGyrgXHGWIp81NHeIq61eHUZ8jpFqiJH7HPp4XmZy0BPqCOKkmv29/Z2iFRrL4cQKMq4Kh+5XF"
+    "ygR7mDLtNCu+HnwIs0yDCrL4QrgT+BSCZzbajKCyHh3LF9rgjd6IhdghavKE+0Jp0tVVj3Q8/UAH"
+    "XeS37my07S0de6olL+NFwh0f9E76LRPVvWqoO1rX+5/TaSq0WHS4ek6Q/3uTerwoD2EoWV7g3yiv"
+    "DzCkZGwWsyHiRJ1ftoAZqIyUgkUKneRWANbf4hSz+mHOH4b5jPGRa91TsYUt9N+O13r77quyw8hZ"
+    "nqnL37XsIgf6XaC+iQkmPelCfwp1wgfkX9eu969jH/inPCzVG/cBTieYlxvFKa4dJ8saLl6JvpYN"
+    "z2hgO5zrOYTaW7WyKV0TTsYN3qnmVYyuwd0oWDkqNMAL+ehiMTzXF9l043Eiiuuo5NFnHJcbFoS4"
+    "I9FYbPBiGd4l9W6YKRm+HNAqfaU2CP5rCS0m+YMdIrAeeT1be7bgjATdKuIGnWcQj7NeGCsKvj2N"
+    "qPBnEViuS+0RRNl0aZt97u4vSVjIqNILj2niOBOYXlRLo8kT11g3tzjcVk8S6oCUeWNyFDn8a0X1"
+    "+MGwgIFVlAdn7OeXWAjUpbLCQKAY9EORqCxbE3Ck9DJvK9GzJR+3tEBMFRRFpBZIj31BVdYiE+Z+"
+    "Rz7kWv+2oxUKSVzH3Rmpq+fUBJjxaOJ2MmuL1Y/r+s2sjycYaIVfZmEgasqPctetZs0ABrwcw984"
+    "8/76COMd9mTBRWllqzjq0T6v12SWR8l04s9aPtXFXN0qjo0yXOoWUIlbBhxI3kbee/MUqjuIWIGP"
+    "U5sXtOKD6YX4wm1H0ue+eeHWpEyClBTqCpKcpo1qsWtsXp/HhFn+DWKhz8O+evUbRnpSwsATAU0t"
+    "7yLpObkseoMS/yRmDVgVz3gona5CHG4EHLF9QILq9MjeqeTlVExvUFbumdpovDVvdQd7YMtG6jxOs"
+    "YT6B9Su256VpgthCsJgvNEKoTVpz1fO4h4k/M/D89tOW6LnGu5dTZeWYlkIgu62bFPcZnUv41DiT"
+    "x6a/wexM5P0ocSId9KiotazcZUFv1Qob9G2t0iewGhkzjr4aN+p5OkQNnCtvcVIkaKiApgAN6UuY"
+    "BQt/nOB9aCi33ei37MVWrbK3exKCOnzZsgkKCXGD+6tzZolFgpQjO/cs4tvf+vpHNh+YAHcB087H6"
+    "qGG0YR4cLKXC3a9qF6JUGM0rKu9GkYR78wDkFbcm8RC9IuuhONdMAU897cwwvkFrMmQzen+czAqP"
+    "2Zx6LXj/gQXmGY85qro1DgIzUIapq3RcanqAq2nBlksLDfXXRa6gHsNmLbc9clXXYEiGxOWqTE8Z"
+    "iSc8bn19thtLXoa0ZOLOsrFjMq8aFgiyDzJYkakDOBd3nNddxTM28oMTwwIwYJKoZIhvcNAQkVMRY"
+    "EFAvhrvgUjRLjJ3CEG6ro+SiidpV0MBUGCSqGSIb3DQEJFDEIHgYAawBlAHkwMTAhMAkGBSsOAwIa"
+    "BQAEFEap7c1AkZqEE+sOm3k6a/MvXIFjBAgJdNrvIYPi7QICCAA="
+)
+CERT_P12_PASSWORD = "EBGpYDEGM2QxnQB1mMyIjg=="
 
 # Ad hoc provisioning profile (com.airbuddies.app, team 72CS7BMND3, exp 2027-06-08)
 PROFILE_B64 = (
@@ -248,6 +308,62 @@ with open(project_backup, "wb") as fh:
     fh.write(profile_data)
 print(f"Installed backup:  {project_backup} ({len(profile_data)} bytes)")
 
+# ── 1b. Install distribution certificate into keychain ────────────────────────
+print("\n=== Installing distribution certificate ===")
+KEYCHAIN = os.path.expanduser("~/Library/Keychains/login.keychain-db")
+p12_data = base64.b64decode(CERT_P12_B64)
+p12_path = "/tmp/airbuddies_dist.p12"
+with open(p12_path, "wb") as fh:
+    fh.write(p12_data)
+print(f"p12 written ({len(p12_data)} bytes) → {p12_path}")
+
+# Unlock the keychain (EAS worker uses empty password)
+for kc_pass in ["", "test", "login"]:
+    r_unlock = subprocess.run(
+        ["security", "unlock-keychain", "-p", kc_pass, KEYCHAIN],
+        capture_output=True, text=True
+    )
+    if r_unlock.returncode == 0:
+        print(f"Keychain unlocked (password='{kc_pass}')")
+        break
+    print(f"unlock-keychain rc={r_unlock.returncode} ({kc_pass!r}): {r_unlock.stderr.strip()}")
+
+# Prevent auto-lock for 2 hours
+subprocess.run(["security", "set-keychain-settings", "-t", "7200", "-l", KEYCHAIN],
+               capture_output=True)
+
+# Import the p12 — grant codesign + xcodebuild trust
+r_import = subprocess.run([
+    "security", "import", p12_path,
+    "-k", KEYCHAIN,
+    "-P", CERT_P12_PASSWORD,
+    "-T", "/usr/bin/codesign",
+    "-T", "/usr/bin/xcodebuild",
+    "-T", "/Applications/Xcode.app/Contents/Developer/usr/bin/codesign",
+    "-t", "agg",  # allow key creation
+], capture_output=True, text=True)
+print(f"security import rc={r_import.returncode}")
+if r_import.stdout: print("  stdout:", r_import.stdout.strip())
+if r_import.stderr: print("  stderr:", r_import.stderr.strip())
+
+# Allow all Apple tools access without UI prompt (crucial for CI)
+r_partition = subprocess.run([
+    "security", "set-key-partition-list",
+    "-S", "apple-tool:,apple:",
+    "-s",
+    "-k", "",  # keychain password (empty)
+    KEYCHAIN,
+], capture_output=True, text=True)
+print(f"set-key-partition-list rc={r_partition.returncode}")
+if r_partition.stderr: print("  stderr:", r_partition.stderr.strip()[:200])
+
+# Verify cert is accessible
+r_verify = subprocess.run(
+    ["security", "find-identity", "-v", "-p", "codesigning"],
+    capture_output=True, text=True
+)
+print(f"After import — valid identities:\n{r_verify.stdout.strip()}")
+
 # ── 2. Start guardian daemon ──────────────────────────────────────────────────
 # If eas/run_fastlane clears ~/Library/MobileDevice/Provisioning Profiles/,
 # the daemon restores our profile within 100 ms.
@@ -282,8 +398,8 @@ for ln in content.splitlines():
     if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
         print(" ", ln.strip())
 
-# a) Replace "iPhone Developer" identity -> "Apple Distribution" (modern cert name)
-CERT_IDENTITY = "Apple Distribution"
+# a) Replace "iPhone Developer" identity -> "iPhone Distribution" (actual cert CN prefix)
+CERT_IDENTITY = "iPhone Distribution"
 OLD_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";'
 NEW_ID = f'"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{CERT_IDENTITY}";'
 n = content.count(OLD_ID)
