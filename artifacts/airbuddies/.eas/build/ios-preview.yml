@@ -19,35 +19,10 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Inject DEVELOPMENT_TEAM into Xcode project
+        name: Verify DEVELOPMENT_TEAM in pbxproj
         command: |
-          python3 - << 'PYEOF'
-          path = 'ios/Airbuddies.xcodeproj/project.pbxproj'
-          team = '72CS7BMND3'
-          with open(path) as f:
-              lines = f.readlines()
-          before = sum(1 for l in lines if 'DEVELOPMENT_TEAM' in l)
-          print('DEVELOPMENT_TEAM lines before:', before)
-          out = []
-          added = 0
-          for line in lines:
-              out.append(line)
-              if 'CODE_SIGN_STYLE' in line and 'DEVELOPMENT_TEAM' not in line:
-                  ws = len(line) - len(line.lstrip('\t '))
-                  out.append(line[:ws] + 'DEVELOPMENT_TEAM = ' + team + ';\n')
-                  added += 1
-          result = ''.join(out)
-          after = result.count('DEVELOPMENT_TEAM')
-          print('Added entries:', added)
-          print('DEVELOPMENT_TEAM lines after:', after)
-          with open(path, 'w') as f:
-              f.write(result)
-          print('Done' if after > 0 else 'WARNING: no entries added')
-          PYEOF
-    - run:
-        name: Disable xcpretty for visible errors
-        command: |
-          mkdir -p ios/fastlane
-          printf 'disable_xcpretty true\n' > ios/fastlane/Gymfile
-          cat ios/fastlane/Gymfile
+          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
+          COUNT=$(grep -c "DEVELOPMENT_TEAM" "$PBXPROJ" || echo "0")
+          echo "DEVELOPMENT_TEAM entries: $COUNT"
+          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -5
     - eas/run_fastlane
