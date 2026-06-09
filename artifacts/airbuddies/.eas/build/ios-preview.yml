@@ -6,7 +6,7 @@ build:
         name: Remove incompatible lockfile
         command: |
           echo "=== PWD: $PWD ==="
-          rm -f ../../pnpm-lock.yaml && echo "Deleted ../../pnpm-lock.yaml" || echo "No lockfile found at ../../"
+          rm -f ../../pnpm-lock.yaml && echo "Deleted ../../pnpm-lock.yaml" || echo "No lockfile found"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
@@ -19,16 +19,28 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Set DEVELOPMENT_TEAM in Xcode project
+        name: Inject DEVELOPMENT_TEAM into Xcode project
         command: |
-          TEAM_ID="72CS7BMND3"
-          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          echo "=== Before fix ==="
-          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -8
-          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PBXPROJ"
-          sed -i '' "s/DEVELOPMENT_TEAM = ;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PBXPROJ"
-          echo "=== After fix ==="
-          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -8
+          python3 - << 'PYEOF'
+          import re, sys
+          path = 'ios/Airbuddies.xcodeproj/project.pbxproj'
+          team = '72CS7BMND3'
+          with open(path) as f:
+              content = f.read()
+          before = content.count('DEVELOPMENT_TEAM')
+          print(f'DEVELOPMENT_TEAM entries before: {before}')
+          if before > 0:
+              content = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', f'DEVELOPMENT_TEAM = {team};', content)
+              print('Replaced existing entries')
+          else:
+              content = re.sub(r'(CODE_SIGN_STYLE = [^\n;]+;)', rf'\1\n\t\t\t\tDEVELOPMENT_TEAM = {team};', content)
+              print('Added DEVELOPMENT_TEAM after CODE_SIGN_STYLE entries')
+          after = content.count('DEVELOPMENT_TEAM')
+          print(f'DEVELOPMENT_TEAM entries after: {after}')
+          with open(path, 'w') as f:
+              f.write(content)
+          print('pbxproj updated successfully')
+          PYEOF
     - run:
         name: Disable xcpretty for visible errors
         command: |
