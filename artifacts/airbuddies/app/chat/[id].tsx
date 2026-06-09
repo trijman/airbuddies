@@ -745,7 +745,6 @@ export default function ChatScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!convMessages.length}
         ListEmptyComponent={
           <View style={styles.emptyChat}>
             <Ionicons name="lock-closed-outline" size={32} color={colors.mutedForeground} />

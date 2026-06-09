@@ -52,6 +52,10 @@ function RootLayoutNav() {
         options={{ headerShown: false, animation: "slide_from_bottom", presentation: "modal" }}
       />
       <Stack.Screen
+        name="group-info/[id]"
+        options={{ headerShown: false, animation: "slide_from_right" }}
+      />
+      <Stack.Screen
         name="my-flights"
         options={{ headerShown: false, animation: "slide_from_right" }}
       />
