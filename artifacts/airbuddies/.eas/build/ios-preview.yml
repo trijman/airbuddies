@@ -19,10 +19,20 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
+        name: Set DEVELOPMENT_TEAM in Xcode project
+        command: |
+          TEAM_ID="72CS7BMND3"
+          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
+          echo "=== Before fix ==="
+          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -8
+          sed -i '' "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PBXPROJ"
+          sed -i '' "s/DEVELOPMENT_TEAM = ;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$PBXPROJ"
+          echo "=== After fix ==="
+          grep "DEVELOPMENT_TEAM" "$PBXPROJ" | head -8
+    - run:
         name: Disable xcpretty for visible errors
         command: |
           mkdir -p ios/fastlane
           printf 'disable_xcpretty true\n' > ios/fastlane/Gymfile
-          echo "=== Gymfile created ==="
           cat ios/fastlane/Gymfile
     - eas/run_fastlane
