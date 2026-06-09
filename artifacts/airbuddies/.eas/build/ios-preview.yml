@@ -6,21 +6,21 @@ build:
         name: Remove incompatible lockfile
         command: |
           echo "=== PWD: $PWD ==="
-          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "none found"
-          find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
-          echo "=== Lockfile removed ==="
+          # After checkout, cwd is artifacts/airbuddies; lockfile is at monorepo root (../../)
+          rm -f ../../pnpm-lock.yaml && echo "Deleted ../../pnpm-lock.yaml" || echo "No lockfile found at ../../"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
     - run:
         name: Expo prebuild
         command: |
-          cd artifacts/airbuddies
+          # cwd is already artifacts/airbuddies — do NOT cd into it again
           pnpm exec expo prebuild --clean --platform ios
     - run:
         name: Post-prebuild sync
         command: |
-          find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
+          # Expo prebuild may have modified package.json — resync lockfile
+          rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - eas/install_pods
     - eas/run_fastlane
