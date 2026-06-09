@@ -17,7 +17,3 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - eas/run_fastlane
-    - eas/upload_artifact:
-        name: Upload IPA
-        type: build
-        path: ios/Airbuddies.ipa
