@@ -19,7 +19,6 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInUp } from "react-native-reanimated";
 
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -52,8 +51,7 @@ function ContactCardBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   const card = msg.contactData;
 
   return (
-    <Animated.View
-      entering={FadeInUp.duration(200)}
+    <View
       style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
     >
       <View
@@ -100,7 +98,7 @@ function ContactCardBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
           {isMe && <StatusIcon status={msg.status} />}
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -152,8 +150,7 @@ function MessageBubble({
     const imgW = 220;
     const imgH = Math.min(Math.max(imgW * asp, 120), 280);
     return (
-      <Animated.View
-        entering={FadeInUp.duration(200)}
+      <View
         style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
       >
         <Pressable
@@ -176,7 +173,7 @@ function MessageBubble({
             </View>
           </View>
         </Pressable>
-      </Animated.View>
+      </View>
     );
   }
 
@@ -184,8 +181,7 @@ function MessageBubble({
     const sizeKB = msg.attachment.size ? Math.round(msg.attachment.size / 1024) : null;
     const ext = msg.attachment.name?.split(".").pop()?.toUpperCase() ?? "FILE";
     return (
-      <Animated.View
-        entering={FadeInUp.duration(200)}
+      <View
         style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
       >
         <Pressable
@@ -240,13 +236,12 @@ function MessageBubble({
             </View>
           </View>
         </Pressable>
-      </Animated.View>
+      </View>
     );
   }
 
   return (
-    <Animated.View
-      entering={FadeInUp.duration(200)}
+    <View
       style={[styles.bubbleWrap, isMe ? styles.bubbleRight : styles.bubbleLeft]}
     >
       <View
@@ -282,7 +277,7 @@ function MessageBubble({
           {isMe && <StatusIcon status={msg.status} />}
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -1040,7 +1035,7 @@ const styles = StyleSheet.create({
   encText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   inviteBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   moreBtn: { padding: 4 },
-  msgList: { padding: 12, flexGrow: 1, justifyContent: "flex-end" },
+  msgList: { padding: 12, flexGrow: 1 },
   bubbleWrap: { marginVertical: 2 },
   bubbleLeft: { alignItems: "flex-start" },
   bubbleRight: { alignItems: "flex-end" },

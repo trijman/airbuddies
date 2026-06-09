@@ -1,7 +1,5 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -14,7 +12,6 @@ function getBadgeCount(conversations: ReturnType<typeof useApp>["conversations"]
   return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 }
 
-// ─── Airline IATA → short name & color ────────────────────────────────────────
 const AIRLINE_TAB: Record<string, { label: string; color: string }> = {
   KL: { label: "KLM", color: "#00a1de" },
   HV: { label: "Transavia", color: "#00c800" },
@@ -69,37 +66,7 @@ function AirlineTabIcon({ color, focused, airlineColor }: { color: string; focus
   );
 }
 
-function NativeTabLayout() {
-  const airline = useActiveAirline();
-  const label = airline?.label ?? "Airline";
-
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "message", selected: "message.fill" }} />
-        <Label>Chats</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="buddies">
-        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
-        <Label>Buddies</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="discover">
-        <Icon sf={{ default: "antenna.radiowaves.left.and.right", selected: "antenna.radiowaves.left.and.right" }} />
-        <Label>Discover</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="airline">
-        <Icon sf={{ default: "airplane.circle", selected: "airplane.circle.fill" }} />
-        <Label>{label}</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <Icon sf={{ default: "gearshape", selected: "gearshape.fill" }} />
-        <Label>Instellingen</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function ClassicTabLayout() {
+export default function TabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -202,9 +169,4 @@ function ClassicTabLayout() {
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
-}
+const styles = StyleSheet.create({});
