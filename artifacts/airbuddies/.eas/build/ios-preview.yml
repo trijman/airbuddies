@@ -6,6 +6,22 @@ build:
         name: Remove incompatible lockfile
         command: rm -f ../../pnpm-lock.yaml && echo "Deleted" || true
     - run:
+        name: Strip expo-dev-client (not needed for distribution builds)
+        command: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const removed = [];
+            ['expo-dev-client'].forEach(dep => {
+              if (pkg.dependencies && pkg.dependencies[dep]) {
+                delete pkg.dependencies[dep];
+                removed.push(dep);
+              }
+            });
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('Removed from dependencies:', removed.join(', ') || 'none');
+          "
+    - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
     - run:
@@ -22,6 +38,8 @@ build:
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
           echo "=== BEFORE PATCH ==="
           grep -n "CODE_SIGN_STYLE" "$PBXPROJ" || echo "(not found)"
+          echo "--- Bundle IDs in project ---"
+          grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | sort -u
           python3 - "$PBXPROJ" <<'PYEOF'
           import sys
           path = sys.argv[1]
