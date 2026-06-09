@@ -3,25 +3,22 @@ build:
   steps:
     - eas/checkout
     - run:
-        name: Debug and remove incompatible lockfile
+        name: Remove incompatible lockfile
         command: |
           echo "=== PWD: $PWD ==="
-          echo "=== Searching for pnpm-lock.yaml ==="
-          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "none found via find"
-          ls pnpm-lock.yaml 2>/dev/null && echo "lockfile AT ROOT" || echo "no lockfile at root"
-          ls ../../pnpm-lock.yaml 2>/dev/null && echo "lockfile TWO LEVELS UP" || echo "not two levels up"
+          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "none found"
           find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
-          echo "=== After deletion ==="
-          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "lockfile removed"
+          echo "=== Lockfile removed ==="
     - run:
-        name: Install node modules (fresh lockfile)
+        name: Install node modules
         command: pnpm install --no-frozen-lockfile
-    - eas/prebuild:
-        inputs:
-          clean: true
-          no_install: true
     - run:
-        name: Post-prebuild reinstall
+        name: Expo prebuild
+        command: |
+          cd artifacts/airbuddies
+          pnpm exec expo prebuild --clean --platform ios
+    - run:
+        name: Post-prebuild sync
         command: |
           find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
           pnpm install --no-frozen-lockfile
