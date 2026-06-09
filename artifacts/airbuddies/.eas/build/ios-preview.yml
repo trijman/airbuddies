@@ -8,5 +8,8 @@ build:
     - eas/prebuild:
         inputs:
           clean: true
+    - run:
+        name: Re-sync lockfile after prebuild modifications
+        command: pnpm install --no-frozen-lockfile
     - eas/install_pods
     - eas/run_fastlane
