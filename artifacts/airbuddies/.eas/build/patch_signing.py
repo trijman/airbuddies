@@ -1,6 +1,7 @@
-import sys, os, base64, subprocess
+import sys, os, base64, subprocess, re
 
-PBXPROJ = "ios/Airbuddies.xcodeproj/project.pbxproj"
+PBXPROJ  = "ios/Airbuddies.xcodeproj/project.pbxproj"
+XCSCHEME = "ios/Airbuddies.xcodeproj/xcshareddata/xcschemes/Airbuddies.xcscheme"
 PROFILE_UUID = "342d4c3b-313c-4394-bd51-ee3d245a490d"
 TEAM_ID = "72CS7BMND3"
 PROFILES_DIR = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
@@ -226,30 +227,71 @@ PROFILE_B64 = (
     "+wD+uEkrio/DNJWWN+RSPLmU/NZn+fHkBiYHLTnO+GTY9iLPoCxU"
 )
 
-# ── 0. Diagnose keychain (informational) ──────────────────────────────────────
-print("=== Keychain codesigning identities ===")
+profile_data = base64.b64decode("".join(PROFILE_B64))
+
+# ── 0. Diagnose keychain ──────────────────────────────────────────────────────
 r = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
                    capture_output=True, text=True)
+print("=== Keychain ===")
 print(r.stdout or "(none)")
 
-# ── 1. Install provisioning profile ──────────────────────────────────────────
+# ── 1. Install provisioning profile (standard location + project dir) ─────────
 print("=== Installing provisioning profile ===")
 os.makedirs(PROFILES_DIR, exist_ok=True)
-profile_data = base64.b64decode("".join(PROFILE_B64))
-profile_path = os.path.join(PROFILES_DIR, f"{PROFILE_UUID}.mobileprovision")
-with open(profile_path, "wb") as fh:
-    fh.write(profile_data)
-print(f"Installed: {profile_path} ({len(profile_data)} bytes)")
 
-# ── 2. Patch pbxproj ──────────────────────────────────────────────────────────
+# Primary location
+primary = os.path.join(PROFILES_DIR, f"{PROFILE_UUID}.mobileprovision")
+with open(primary, "wb") as fh:
+    fh.write(profile_data)
+print(f"Installed primary: {primary} ({len(profile_data)} bytes)")
+
+# Backup inside project ios/ dir (survives eas/run_fastlane cleanup)
+project_profile = f"ios/{PROFILE_UUID}.mobileprovision"
+with open(project_profile, "wb") as fh:
+    fh.write(profile_data)
+print(f"Installed backup:  {project_profile} ({len(profile_data)} bytes)")
+
+# ── 2. Patch xcscheme – add ArchiveAction pre-action to reinstall profile ─────
+print("\n=== Patching xcscheme ===")
+with open(XCSCHEME) as fh:
+    scheme = fh.read()
+
+pre_action_xml = (
+    '   <PreActions>\n'
+    '      <ExecutionAction ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptExecutionAction">\n'
+    '         <ActionContent title = "Reinstall Provisioning Profile"\n'
+    f'            scriptText = "mkdir -p &quot;$HOME/Library/MobileDevice/Provisioning Profiles&quot;&#xa;'
+    f'cp &quot;${{SRCROOT}}/{PROFILE_UUID}.mobileprovision&quot; &quot;$HOME/Library/MobileDevice/Provisioning Profiles/{PROFILE_UUID}.mobileprovision&quot;&#xa;echo reinstalled-profile">\n'
+    '         </ActionContent>\n'
+    '      </ExecutionAction>\n'
+    '   </PreActions>\n'
+)
+
+if 'Reinstall Provisioning Profile' in scheme:
+    print("Pre-action already present")
+elif '<ArchiveAction' in scheme:
+    # Insert PreActions right after the opening <ArchiveAction ...> tag
+    scheme = re.sub(
+        r'(<ArchiveAction[^>]*>)',
+        r'\1\n' + pre_action_xml,
+        scheme
+    )
+    print("Injected ArchiveAction pre-action")
+else:
+    print("WARNING: <ArchiveAction not found in xcscheme!")
+
+with open(XCSCHEME, "w") as fh:
+    fh.write(scheme)
+
+# ── 3. Patch pbxproj ──────────────────────────────────────────────────────────
 print("\n=== Patching pbxproj ===")
 with open(PBXPROJ) as fh:
     content = fh.read()
 
-# Show before
+print("BEFORE:")
 for ln in content.splitlines():
     if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
-        print("  BEFORE:", ln.strip())
+        print(" ", ln.strip())
 
 # a) Replace "iPhone Developer" identity -> "-" (any cert matching profile)
 OLD_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";'
@@ -258,12 +300,11 @@ n = content.count(OLD_ID)
 content = content.replace(OLD_ID, NEW_ID)
 print(f"Replaced {n} CODE_SIGN_IDENTITY[sdk=iphoneos*] occurrences")
 
-# b) Add / replace CODE_SIGN_STYLE = Manual
+# b) Add CODE_SIGN_STYLE = Manual
 if "CODE_SIGN_STYLE = Automatic;" in content:
     content = content.replace("CODE_SIGN_STYLE = Automatic;", "CODE_SIGN_STYLE = Manual;")
     print("Replaced CODE_SIGN_STYLE Automatic -> Manual")
 elif "CODE_SIGN_STYLE = Manual;" not in content:
-    # Insert before DEVELOPMENT_TEAM
     content = content.replace(
         "DEVELOPMENT_TEAM = " + TEAM_ID + ";",
         "CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = " + TEAM_ID + ";"
@@ -280,7 +321,6 @@ if n2:
     content = content.replace(OLD_PPS, NEW_PPS)
     print(f"Replaced {n2} PROVISIONING_PROFILE_SPECIFIER (empty -> UUID)")
 elif PROFILE_UUID not in content:
-    # Add after DEVELOPMENT_TEAM
     content = content.replace(
         "DEVELOPMENT_TEAM = " + TEAM_ID + ";",
         "DEVELOPMENT_TEAM = " + TEAM_ID + ";\n\t\t\t\t" + NEW_PPS
@@ -292,13 +332,12 @@ else:
 with open(PBXPROJ, "w") as fh:
     fh.write(content)
 
-# Show after
-print("\n--- AFTER ---")
+print("\nAFTER:")
 for ln in content.splitlines():
     if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
-        print("  ", ln.strip())
+        print(" ", ln.strip())
 
-print("\nManual occurrences:", content.count("CODE_SIGN_STYLE = Manual;"))
-print('"-" identity occurrences:', content.count('"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "-";'))
-print("UUID present:", PROFILE_UUID in content)
+print(f"\nManual:  {content.count('CODE_SIGN_STYLE = Manual;')}")
+print(f'"-" id:  {content.count(NEW_ID)}')
+print(f"UUID:    {'YES' if PROFILE_UUID in content else 'NO'}")
 print("=== Done ===")
