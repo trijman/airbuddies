@@ -1,12 +1,19 @@
 build:
   name: iOS Preview
   steps:
+    - run:
+        name: Check pre-installed credentials
+        command: |
+          echo "=== Keychain signing identities ==="
+          security find-identity -v -p codesigning 2>/dev/null || echo "(none)"
+          echo "=== Provisioning profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "(none)"
+          echo "=== Apple auth env vars ==="
+          env | grep -iE "apple|asc|fastlane|match" || echo "(none)"
     - eas/checkout
     - run:
         name: Remove incompatible lockfile
-        command: |
-          echo "=== PWD: $PWD ==="
-          rm -f ../../pnpm-lock.yaml && echo "Deleted ../../pnpm-lock.yaml" || echo "No lockfile found"
+        command: rm -f ../../pnpm-lock.yaml && echo "Deleted" || echo "No lockfile"
     - run:
         name: Install node modules
         command: pnpm install --no-frozen-lockfile
@@ -19,9 +26,20 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Verify DEVELOPMENT_TEAM in pbxproj
+        name: Patch pbxproj - Automatic signing + Distribution identity
         command: |
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          echo "DEVELOPMENT_TEAM entries: $(grep -c 'DEVELOPMENT_TEAM' "$PBXPROJ" || echo 0)"
-          grep "DEVELOPMENT_TEAM\|CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|PROVISIONING_PROFILE" "$PBXPROJ" | head -10
+          # Switch to Automatic signing so Xcode can find pre-installed credentials
+          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PBXPROJ"
+          # Fix identity: Development → Distribution for Release
+          sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution"/g' "$PBXPROJ"
+          echo "=== After patch ==="
+          grep "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY\|DEVELOPMENT_TEAM\|PROVISIONING_PROFILE" "$PBXPROJ" | head -12
+    - run:
+        name: Check credentials again (post-prebuild)
+        command: |
+          echo "=== Keychain signing identities ==="
+          security find-identity -v -p codesigning 2>/dev/null || echo "(none)"
+          echo "=== Provisioning profiles ==="
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "(none)"
     - eas/run_fastlane
