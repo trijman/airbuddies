@@ -3,8 +3,10 @@ build:
   steps:
     - eas/checkout
     - run:
-        name: Remove lockfile
-        command: rm -f ../../pnpm-lock.yaml || true
+        name: Remove lockfile and workspace config
+        command: |
+          rm -f ../../pnpm-lock.yaml || true
+          rm -f ../../pnpm-workspace.yaml || true
     - run:
         name: Strip expo-dev-client
         command: node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.dependencies['expo-dev-client'];fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
@@ -20,6 +22,6 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Patch pbxproj - set distribution signing + profile UUID
+        name: Patch pbxproj - install profile + set distribution signing
         command: python3 .eas/build/patch_signing.py
     - eas/run_fastlane
