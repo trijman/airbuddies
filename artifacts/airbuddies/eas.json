@@ -17,16 +17,13 @@
       "pnpm": "10.26.1",
       "config": "ios-preview.yml",
       "ios": {
-        "buildConfiguration": "Release",
-        "image": "latest"
+        "buildConfiguration": "Release"
       }
     },
     "production": {
       "autoIncrement": true,
       "pnpm": "10.26.1",
-      "ios": {
-        "image": "latest"
-      }
+      "ios": {}
     }
   },
   "submit": {
