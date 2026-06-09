@@ -14,7 +14,7 @@
     },
     "preview": {
       "distribution": "internal",
-      "pnpm": "10.26.1",
+      "credentialsSource": "remote",
       "config": "ios-preview.yml",
       "ios": {
         "buildConfiguration": "Release"
