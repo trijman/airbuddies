@@ -15,7 +15,7 @@
     "preview": {
       "distribution": "internal",
       "pnpm": "10.26.1",
-      "config": ".eas/build/ios-preview.yml",
+      "config": "ios-preview.yml",
       "ios": {
         "buildConfiguration": "Release",
         "image": "latest"
