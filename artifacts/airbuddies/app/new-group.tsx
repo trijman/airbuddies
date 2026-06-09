@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import {
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 
 import { Avatar } from "@/components/Avatar";
 import { useApp } from "@/context/AppContext";
@@ -120,7 +120,7 @@ export default function NewGroupScreen() {
       </View>
 
       {step === 0 && (
-        <KeyboardAwareScrollView
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 20 }]}
           showsVerticalScrollIndicator={false}
@@ -197,15 +197,15 @@ export default function NewGroupScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
           </Pressable>
-        </KeyboardAwareScrollView>
+        </ScrollView>
       )}
 
       {step === 1 && (
-        <KeyboardAwareScrollView
+        <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 20 }]}
           keyboardShouldPersistTaps="handled"
-          bottomOffset={16}
+
           showsVerticalScrollIndicator={false}
         >
           {groupType === "flight" && (
@@ -345,7 +345,7 @@ export default function NewGroupScreen() {
               </Text>
             </View>
           )}
-        </KeyboardAwareScrollView>
+        </ScrollView>
       )}
     </View>
   );

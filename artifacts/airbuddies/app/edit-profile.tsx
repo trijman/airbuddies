@@ -15,7 +15,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 
 import { Avatar } from "@/components/Avatar";
 import { InterestChip } from "@/components/InterestChip";
@@ -171,11 +170,11 @@ export default function EditProfileScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAwareScrollView
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 24 }]}
         keyboardShouldPersistTaps="handled"
-        bottomOffset={16}
+
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.avatarSection}>
@@ -285,7 +284,7 @@ export default function EditProfileScreen() {
             <Input value={instagram} onChangeText={setInstagram} placeholder="@gebruikersnaam" />
           </Field>
         </View>
-      </KeyboardAwareScrollView>
+      </ScrollView>
     </View>
   );
 }
