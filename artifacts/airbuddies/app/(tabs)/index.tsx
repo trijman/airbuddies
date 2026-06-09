@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
 import { useApp } from "@/context/AppContext";
@@ -67,15 +66,14 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
   const isFlight = !!conv.flightNumber;
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
-      <Pressable
-        style={({ pressed }) => [
-          styles.convItem,
-          { backgroundColor: pressed ? colors.muted : colors.card },
-        ]}
-        onPress={() => router.push(`/chat/${conv.id}`)}
-        testID={`conv-item-${conv.id}`}
-      >
+    <Pressable
+      style={({ pressed }) => [
+        styles.convItem,
+        { backgroundColor: pressed ? colors.muted : colors.card },
+      ]}
+      onPress={() => router.push(`/chat/${conv.id}`)}
+      testID={`conv-item-${conv.id}`}
+    >
         <Avatar
           name={name}
           seed={seed}
@@ -159,7 +157,6 @@ function ConvItem({ conv, index }: { conv: Conversation; index: number }) {
           </View>
         </View>
       </Pressable>
-    </Animated.View>
   );
 }
 

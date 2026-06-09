@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { Avatar } from "@/components/Avatar";
 import { InterestChip } from "@/components/InterestChip";
@@ -70,15 +69,14 @@ function BuddyCard({
   };
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
-      <Pressable
-        style={({ pressed }) => [
-          styles.card,
-          { backgroundColor: pressed ? colors.muted : colors.card, borderColor: colors.border },
-        ]}
-        onPress={() => onOpenCard(buddy)}
-        testID={`buddy-row-${buddy.id}`}
-      >
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: pressed ? colors.muted : colors.card, borderColor: colors.border },
+      ]}
+      onPress={() => onOpenCard(buddy)}
+      testID={`buddy-row-${buddy.id}`}
+    >
         <View style={styles.cardTop}>
           <Avatar
             name={buddy.name}
@@ -168,7 +166,6 @@ function BuddyCard({
           </View>
         )}
       </Pressable>
-    </Animated.View>
   );
 }
 
@@ -202,11 +199,10 @@ function RequestCard({
   };
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
-      <Pressable
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.primary + "44" }]}
-        onPress={() => onOpenCard(buddy)}
-      >
+    <Pressable
+      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.primary + "44" }]}
+      onPress={() => onOpenCard(buddy)}
+    >
         <View style={styles.cardTop}>
           <Avatar
             name={buddy.name}
@@ -269,7 +265,6 @@ function RequestCard({
           </Pressable>
         </View>
       </Pressable>
-    </Animated.View>
   );
 }
 
@@ -448,11 +443,10 @@ export default function BuddiesScreen() {
                 onOpenCard={setSelectedBuddy}
               />
             ) : (
-              <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
-                <Pressable
-                  style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={() => setSelectedBuddy(item)}
-                >
+              <Pressable
+                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setSelectedBuddy(item)}
+              >
                   <View style={styles.cardTop}>
                     <Avatar name={item.name} size={48} uri={item.avatarUri} />
                     <View style={styles.cardInfo}>
@@ -469,7 +463,6 @@ export default function BuddiesScreen() {
                     </View>
                   </View>
                 </Pressable>
-              </Animated.View>
             )
           }
           contentContainerStyle={[styles.list, isWeb ? { paddingBottom: 34 } : undefined]}
