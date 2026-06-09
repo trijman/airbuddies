@@ -97,4 +97,3 @@ build:
           find /tmp -name "*.ipa" 2>/dev/null || true
     - eas/upload_artifact:
         name: iOS IPA
-        artifactPath: ios/Airbuddies.ipa
