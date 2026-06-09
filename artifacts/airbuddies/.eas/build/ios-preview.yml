@@ -16,4 +16,12 @@ build:
         command: |
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
+    - run:
+        name: Patch pbxproj - enable Automatic signing
+        command: |
+          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
+          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PBXPROJ"
+          sed -i '' 's/"iPhone Developer"/"iPhone Distribution"/g' "$PBXPROJ"
+          echo "=== Signing settings after patch ==="
+          grep -E "CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM" "$PBXPROJ" | head -10
     - eas/run_fastlane
