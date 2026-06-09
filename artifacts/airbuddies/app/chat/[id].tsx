@@ -297,7 +297,10 @@ export default function ChatScreen() {
   const isWeb = Platform.OS === "web";
 
   const conv = conversations.find((c) => c.id === id);
-  const convMessages = messages[id ?? ""] ?? [];
+  const convMessages = (id ? (messages[id] ?? []) : []);
+  const safeParticipantIds = conv?.participantIds ?? [];
+
+  console.log("[OPEN CHAT]", id, conv?.id, conv?.type, "msgs:", convMessages.length, "participants:", safeParticipantIds.length);
 
   // ── Seat gate: check if user has a seat number for this flight ──────────
   useFocusEffect(
@@ -628,6 +631,14 @@ export default function ChatScreen() {
     options.push({ text: "Annuleer", style: "cancel" });
     Alert.alert(title, undefined, options);
   };
+
+  if (!conv) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>Chat laden…</Text>
+      </View>
+    );
+  }
 
   return (
     <RNKeyboardAvoidingView
