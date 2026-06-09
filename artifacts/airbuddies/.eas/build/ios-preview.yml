@@ -17,10 +17,22 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Patch pbxproj - Automatic signing only
+        name: Patch pbxproj - enable Automatic signing
         command: |
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          sed -i '' 's/CODE_SIGN_STYLE = Manual/CODE_SIGN_STYLE = Automatic/g' "$PBXPROJ"
-          echo "=== Signing settings after patch ==="
-          grep -E "CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM" "$PBXPROJ" | head -10
+          echo "=== BEFORE PATCH ==="
+          grep -n "CODE_SIGN_STYLE" "$PBXPROJ" || echo "(not found)"
+          python3 - "$PBXPROJ" <<'PYEOF'
+          import sys
+          path = sys.argv[1]
+          with open(path, 'r') as f:
+              c = f.read()
+          count = c.count('CODE_SIGN_STYLE = Manual')
+          new_c = c.replace('CODE_SIGN_STYLE = Manual', 'CODE_SIGN_STYLE = Automatic')
+          with open(path, 'w') as f:
+              f.write(new_c)
+          print(f"Replaced {count} occurrence(s) of CODE_SIGN_STYLE = Manual")
+          PYEOF
+          echo "=== AFTER PATCH ==="
+          grep -n "CODE_SIGN_STYLE" "$PBXPROJ" || echo "(not found)"
     - eas/run_fastlane
