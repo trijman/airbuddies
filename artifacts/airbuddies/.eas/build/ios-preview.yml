@@ -18,19 +18,14 @@ build:
         command: |
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
-    - eas/run_fastlane
     - run:
-        name: Show Xcode build errors
-        when: always
+        name: Disable xcpretty for visible errors
         command: |
-          LOG="$HOME/Library/Logs/gym/Airbuddies-Airbuddies.log"
-          if [ -f "$LOG" ]; then
-            echo "=== Xcode error/warning lines ==="
-            grep -iE "(error:|warning:|FAILED|undefined|symbol|cannot|missing|clang|ld:)" "$LOG" | grep -v "note:" | head -100
-            echo ""
-            echo "=== Last 150 lines of gym log ==="
-            tail -150 "$LOG"
-          else
-            echo "No gym log at $LOG"
-            ls "$HOME/Library/Logs/gym/" 2>/dev/null || echo "No gym logs directory"
-          fi
+          mkdir -p ios/fastlane
+          # Gymfile settings are read by gym action in the Fastfile
+          cat > ios/fastlane/Gymfile << 'GYMEOF'
+disable_xcpretty true
+GYMEOF
+          echo "=== Created Gymfile ==="
+          cat ios/fastlane/Gymfile
+    - eas/run_fastlane
