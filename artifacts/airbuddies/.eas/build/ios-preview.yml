@@ -19,29 +19,87 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Create diagnostic Fastfile
+        name: Comprehensive credential diagnostic
         command: |
-          mkdir -p ios/fastlane
-          python3 -c "
-          content = '''default_platform(:ios)
-          platform :ios do
-            lane :default do
-              puts \"=== PROVISIONING PROFILES ===\"
-              sh(\"ls -la \\\\\"$HOME/Library/MobileDevice/Provisioning Profiles/\\\\\" 2>/dev/null || echo none\")
-              puts \"=== CODESIGNING IDENTITIES ===\"
-              sh(\"security find-identity -v -p codesigning 2>/dev/null || echo none\")
-              puts \"=== GEMS WITH SIGNING ===\"
-              sh(\"gem list 2>/dev/null | grep -iE (expo|signing|match|cert|sigh) || echo none\")
-              puts \"=== ENV CREDENTIAL VARS ===\"
-              sh(\"env | grep -iE (CERT|PROV|P12|PROFILE|SIGN|APPLE|TEAM|MATCH) | sed s/=.*/=REDACTED/ || echo none\")
-              puts \"=== DIAGNOSIS COMPLETE ===\"
-            end
-          end
-          '''
-          with open('ios/fastlane/Fastfile', 'w') as f:
-              f.write(content)
-          print('Fastfile written')
-          "
-          echo "=== Fastfile contents ==="
-          cat ios/fastlane/Fastfile
+          python3 - << 'PYEOF'
+          import os, json, urllib.request, base64, subprocess
+
+          token = os.environ.get('EXPO_TOKEN','')
+          build_id = os.environ.get('EAS_BUILD_ID','')
+          project_id = os.environ.get('EAS_BUILD_PROJECT_ID','')
+
+          print(f"BUILD_ID={build_id}")
+          print(f"PROJECT_ID={project_id}")
+
+          # Decode JWT payload (no verification needed - just inspect claims)
+          try:
+              parts = token.split('.')
+              if len(parts) >= 2:
+                  payload = parts[1] + '=' * (4 - len(parts[1]) % 4)
+                  decoded = base64.urlsafe_b64decode(payload).decode('utf-8', errors='replace')
+                  print(f"\n=== JWT payload claims ===\n{decoded[:500]}")
+          except Exception as e:
+              print(f"JWT decode error: {e}")
+
+          # Check __EAS_BUILD_ENVS_DIR files
+          envs_dir = os.environ.get('__EAS_BUILD_ENVS_DIR','')
+          print(f"\n=== __EAS_BUILD_ENVS_DIR={envs_dir} ===")
+          if envs_dir and os.path.isdir(envs_dir):
+              files = os.listdir(envs_dir)
+              print(f"Files: {files}")
+              for f in files[:10]:
+                  p = os.path.join(envs_dir, f)
+                  size = os.path.getsize(p)
+                  print(f"  {f}: {size} bytes")
+          else:
+              print("Directory not found or empty")
+
+          # Check ALL env vars (including Apple-related)
+          print("\n=== ALL env vars containing ASC/APPLE/FASTLANE/MATCH ===")
+          for k, v in sorted(os.environ.items()):
+              if any(x in k.upper() for x in ['ASC','APPLE','FASTLANE','MATCH','SIGH']):
+                  print(f"  {k}={v[:30]}...")
+
+          # Try various EAS API endpoints with build token
+          print("\n=== Testing EAS API endpoints ===")
+          endpoints = [
+              f"https://api.expo.dev/v2/auth/user",
+              f"https://api.expo.dev/v2/builds/{build_id}",
+              f"https://api.expo.dev/v2/builds/{build_id}/ios-credentials",
+          ]
+          for url in endpoints:
+              try:
+                  req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"}, method="GET")
+                  with urllib.request.urlopen(req, timeout=8) as resp:
+                      data = resp.read().decode()
+                      print(f"  SUCCESS {url}:\n  {data[:300]}")
+              except Exception as e:
+                  print(f"  FAIL {url}: {e}")
+
+          # Try EAS GraphQL with build token
+          print("\n=== EAS GraphQL with build token ===")
+          gql = '{"query":"{ app { byId(appId: \\"' + project_id + '\\") { slug iosAppCredentials { id appleAppIdentifier { bundleIdentifier } iosAppBuildCredentialsList { id iosDistributionType distributionCertificate { id serialNumber } provisioningProfile { id status expiration } } } } } }"}'
+          try:
+              req = urllib.request.Request("https://api.expo.dev/graphql", data=gql.encode(), headers={"Content-Type":"application/json","Authorization":f"Bearer {token}"}, method="POST")
+              with urllib.request.urlopen(req, timeout=10) as resp:
+                  data = resp.read().decode()
+                  print(f"  {data[:600]}")
+          except Exception as e:
+              print(f"  FAIL: {e}")
+
+          # Check internal EAS services (similar to cocoapods cache URL)
+          print("\n=== Internal EAS services ===")
+          for host in ['signing.eas-build.internal','credentials.eas-build.internal','certificates.eas-build.internal']:
+              try:
+                  req = urllib.request.Request(f"http://{host}/", method="GET")
+                  with urllib.request.urlopen(req, timeout=3) as resp:
+                      print(f"  {host} REACHABLE: {resp.status}")
+              except Exception as e:
+                  print(f"  {host}: {str(e)[:60]}")
+          PYEOF
+    - run:
+        name: Verify DEVELOPMENT_TEAM in pbxproj
+        command: |
+          grep -c "DEVELOPMENT_TEAM" ios/Airbuddies.xcodeproj/project.pbxproj || echo 0
+          grep "CODE_SIGN_STYLE\|CODE_SIGN_IDENTITY" ios/Airbuddies.xcodeproj/project.pbxproj | head -6
     - eas/run_fastlane
