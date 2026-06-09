@@ -1,7 +1,6 @@
-import sys, os, base64, subprocess, re
+import sys, os, base64, subprocess
 
-PBXPROJ  = "ios/Airbuddies.xcodeproj/project.pbxproj"
-XCSCHEME = "ios/Airbuddies.xcodeproj/xcshareddata/xcschemes/Airbuddies.xcscheme"
+PBXPROJ = "ios/Airbuddies.xcodeproj/project.pbxproj"
 PROFILE_UUID = "342d4c3b-313c-4394-bd51-ee3d245a490d"
 TEAM_ID = "72CS7BMND3"
 PROFILES_DIR = os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
@@ -229,59 +228,49 @@ PROFILE_B64 = (
 
 profile_data = base64.b64decode("".join(PROFILE_B64))
 
-# ── 0. Diagnose keychain ──────────────────────────────────────────────────────
+# ── 0. Keychain diagnostics ───────────────────────────────────────────────────
 r = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
                    capture_output=True, text=True)
 print("=== Keychain ===")
 print(r.stdout or "(none)")
 
-# ── 1. Install provisioning profile (standard location + project dir) ─────────
+# ── 1. Install provisioning profile (standard + project backup) ───────────────
 print("=== Installing provisioning profile ===")
 os.makedirs(PROFILES_DIR, exist_ok=True)
 
-# Primary location
 primary = os.path.join(PROFILES_DIR, f"{PROFILE_UUID}.mobileprovision")
 with open(primary, "wb") as fh:
     fh.write(profile_data)
 print(f"Installed primary: {primary} ({len(profile_data)} bytes)")
 
-# Backup inside project ios/ dir (survives eas/run_fastlane cleanup)
-project_profile = f"ios/{PROFILE_UUID}.mobileprovision"
-with open(project_profile, "wb") as fh:
+project_backup = os.path.abspath(f"ios/{PROFILE_UUID}.mobileprovision")
+with open(project_backup, "wb") as fh:
     fh.write(profile_data)
-print(f"Installed backup:  {project_profile} ({len(profile_data)} bytes)")
+print(f"Installed backup:  {project_backup} ({len(profile_data)} bytes)")
 
-# ── 2. Patch xcscheme – add ArchiveAction pre-action to reinstall profile ─────
-print("\n=== Patching xcscheme ===")
-with open(XCSCHEME) as fh:
-    scheme = fh.read()
-
-pre_action_xml = (
-    '   <PreActions>\n'
-    '      <ExecutionAction ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptExecutionAction">\n'
-    '         <ActionContent title = "Reinstall Provisioning Profile"\n'
-    f'            scriptText = "mkdir -p &quot;$HOME/Library/MobileDevice/Provisioning Profiles&quot;&#xa;'
-    f'cp &quot;${{SRCROOT}}/{PROFILE_UUID}.mobileprovision&quot; &quot;$HOME/Library/MobileDevice/Provisioning Profiles/{PROFILE_UUID}.mobileprovision&quot;&#xa;echo reinstalled-profile">\n'
-    '         </ActionContent>\n'
-    '      </ExecutionAction>\n'
-    '   </PreActions>\n'
+# ── 2. Start guardian daemon ──────────────────────────────────────────────────
+# If eas/run_fastlane clears ~/Library/MobileDevice/Provisioning Profiles/,
+# the daemon restores our profile within 100 ms.
+daemon_script = f"""
+while true; do
+  PDIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+  TARGET="$PDIR/{PROFILE_UUID}.mobileprovision"
+  BACKUP="{project_backup}"
+  if [ ! -f "$TARGET" ] && [ -f "$BACKUP" ]; then
+    mkdir -p "$PDIR"
+    cp "$BACKUP" "$TARGET"
+    echo "$(date) guardian: reinstalled provisioning profile" >> /tmp/profile_guardian.log
+  fi
+  sleep 0.1
+done
+"""
+daemon = subprocess.Popen(
+    ["bash", "-c", daemon_script],
+    start_new_session=True,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
 )
-
-if 'Reinstall Provisioning Profile' in scheme:
-    print("Pre-action already present")
-elif '<ArchiveAction' in scheme:
-    # Insert PreActions right after the opening <ArchiveAction ...> tag
-    scheme = re.sub(
-        r'(<ArchiveAction[^>]*>)',
-        r'\1\n' + pre_action_xml,
-        scheme
-    )
-    print("Injected ArchiveAction pre-action")
-else:
-    print("WARNING: <ArchiveAction not found in xcscheme!")
-
-with open(XCSCHEME, "w") as fh:
-    fh.write(scheme)
+print(f"Guardian daemon started (PID {daemon.pid})")
 
 # ── 3. Patch pbxproj ──────────────────────────────────────────────────────────
 print("\n=== Patching pbxproj ===")
