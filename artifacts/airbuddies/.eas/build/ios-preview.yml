@@ -19,33 +19,27 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Diagnose - credential env vars and signing gems
+        name: Create diagnostic Fastfile to inspect EAS signing setup
         command: |
-          echo "=== Credential-related env vars ==="
-          python3 -c "
-          import os
-          for k, v in sorted(os.environ.items()):
-              if any(x in k.upper() for x in ['CERT','PROV','P12','PROFILE','SIGN','APPLE','EXPO','TEAM','EAS','DIST','KEYCHAIN']):
-                  val = v[:60] + '...' if len(v) > 60 else v
-                  print(f'{k}={val}')
-          " || echo "python failed"
-          echo ""
-          echo "=== All EAS_ vars ==="
-          env | grep "^EAS_" | sed 's/=.*/=<truncated>/' || echo "none"
-          echo ""
-          echo "=== expo signing gems ==="
-          gem list 2>/dev/null | grep -i expo || echo "no expo gems"
-          find /usr/local/lib /opt /var/lib -name "*expo_setup*" 2>/dev/null | head -5 || true
-          echo ""
-          echo "=== Installed provisioning profiles ==="
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null | head -10 || echo "none installed"
-          echo ""
-          echo "=== fastlane dir check ==="
-          ls -la ios/fastlane/ 2>/dev/null || echo "no ios/fastlane dir"
-    - run:
-        name: Verify DEVELOPMENT_TEAM in pbxproj
-        command: |
-          PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
-          echo "DEVELOPMENT_TEAM entries: $(grep -c 'DEVELOPMENT_TEAM' "$PBXPROJ")"
-          grep "DEVELOPMENT_TEAM\|CODE_SIGN_STYLE\|PROVISIONING_PROFILE" "$PBXPROJ" | head -10
+          mkdir -p ios/fastlane
+          cat > ios/fastlane/Fastfile << 'HEREDOC'
+default_platform(:ios)
+platform :ios do
+  lane :default do
+    puts "=== PROVISIONING PROFILES ==="
+    sh("ls -la \"$HOME/Library/MobileDevice/Provisioning Profiles/\" 2>/dev/null || echo 'none installed'")
+    puts "=== CODESIGNING IDENTITIES ==="
+    sh("security find-identity -v -p codesigning 2>/dev/null || echo 'none'")
+    puts "=== KEYCHAIN LIST ==="
+    sh("security list-keychains 2>/dev/null || echo 'none'")
+    puts "=== GEM LIST ==="
+    sh("gem list 2>/dev/null | grep -iE '(expo|signing|match|cert|sigh)' || echo 'no relevant gems'")
+    puts "=== ENV CREDENTIAL VARS ==="
+    sh("env | grep -iE '(CERT|PROV|P12|PROFILE|SIGN|APPLE|TEAM|MATCH)' | sed 's/=.*/=[REDACTED]/' || echo 'none'")
+    puts "=== DIAGNOSIS COMPLETE ==="
+  end
+end
+HEREDOC
+          echo "=== Diagnostic Fastfile created ==="
+          cat ios/fastlane/Fastfile
     - eas/run_fastlane
