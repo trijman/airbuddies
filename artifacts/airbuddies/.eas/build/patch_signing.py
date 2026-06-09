@@ -1,4 +1,4 @@
-import re, sys, os, base64, subprocess
+import sys, os, base64, subprocess
 
 PBXPROJ = "ios/Airbuddies.xcodeproj/project.pbxproj"
 PROFILE_UUID = "342d4c3b-313c-4394-bd51-ee3d245a490d"
@@ -226,86 +226,79 @@ PROFILE_B64 = (
     "+wD+uEkrio/DNJWWN+RSPLmU/NZn+fHkBiYHLTnO+GTY9iLPoCxU"
 )
 
-# ── 0. Diagnose keychain ──────────────────────────────────────────────────────
+# ── 0. Diagnose keychain (informational) ──────────────────────────────────────
 print("=== Keychain codesigning identities ===")
 r = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
                    capture_output=True, text=True)
 print(r.stdout or "(none)")
-print(r.stderr or "")
 
 # ── 1. Install provisioning profile ──────────────────────────────────────────
-print("\n=== Installing provisioning profile ===")
+print("=== Installing provisioning profile ===")
 os.makedirs(PROFILES_DIR, exist_ok=True)
 profile_data = base64.b64decode("".join(PROFILE_B64))
 profile_path = os.path.join(PROFILES_DIR, f"{PROFILE_UUID}.mobileprovision")
-with open(profile_path, "wb") as f:
-    f.write(profile_data)
+with open(profile_path, "wb") as fh:
+    fh.write(profile_data)
 print(f"Installed: {profile_path} ({len(profile_data)} bytes)")
 
-# ── 2. Determine correct cert identity from keychain ─────────────────────────
-print("\n=== Determining signing identity ===")
-cert_identity = "iPhone Distribution"  # default fallback
-r2 = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
-                    capture_output=True, text=True)
-keychain_out = r2.stdout
-# Look for distribution cert - prefer "Apple Distribution" then "iPhone Distribution"
-for prefix in ("Apple Distribution", "iPhone Distribution"):
-    if prefix in keychain_out:
-        cert_identity = prefix
-        print(f"Found distribution cert: {cert_identity}")
-        break
-else:
-    print(f"No distribution cert found in keychain yet; using: {cert_identity}")
-
-# ── 3. Patch pbxproj ─────────────────────────────────────────────────────────
+# ── 2. Patch pbxproj ──────────────────────────────────────────────────────────
 print("\n=== Patching pbxproj ===")
-with open(PBXPROJ) as f:
-    content = f.read()
+with open(PBXPROJ) as fh:
+    content = fh.read()
 
-# Show BEFORE state
-code_sign_lines = [l.strip() for l in content.splitlines()
-                   if any(k in l for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING"))]
-print("BEFORE:")
-for l in code_sign_lines[:20]:
-    print(" ", l)
+# Show before
+for ln in content.splitlines():
+    if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
+        print("  BEFORE:", ln.strip())
 
-# Replace ALL CODE_SIGN_IDENTITY values (any value) → cert_identity
-content = re.sub(
-    r'CODE_SIGN_IDENTITY = "[^"]*";',
-    f'CODE_SIGN_IDENTITY = "{cert_identity}";',
-    content
-)
-content = re.sub(
-    r'"CODE_SIGN_IDENTITY\\[sdk=iphoneos\\*\\]" = "[^"]*";',
-    f'"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "{cert_identity}";',
-    content
-)
-# Set Manual signing
-content = re.sub(r'CODE_SIGN_STYLE = [^;]+;',
-                 'CODE_SIGN_STYLE = Manual;', content)
-# Set team
-content = re.sub(r'DEVELOPMENT_TEAM = [^;]*;',
-                 f'DEVELOPMENT_TEAM = {TEAM_ID};', content)
-# Set provisioning profile
-content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = [^;]*;',
-                 f'PROVISIONING_PROFILE_SPECIFIER = "{PROFILE_UUID}";', content)
-if "PROVISIONING_PROFILE_SPECIFIER" not in content:
+# a) Replace "iPhone Developer" identity -> "-" (any cert matching profile)
+OLD_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";'
+NEW_ID = '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "-";'
+n = content.count(OLD_ID)
+content = content.replace(OLD_ID, NEW_ID)
+print(f"Replaced {n} CODE_SIGN_IDENTITY[sdk=iphoneos*] occurrences")
+
+# b) Add / replace CODE_SIGN_STYLE = Manual
+if "CODE_SIGN_STYLE = Automatic;" in content:
+    content = content.replace("CODE_SIGN_STYLE = Automatic;", "CODE_SIGN_STYLE = Manual;")
+    print("Replaced CODE_SIGN_STYLE Automatic -> Manual")
+elif "CODE_SIGN_STYLE = Manual;" not in content:
+    # Insert before DEVELOPMENT_TEAM
     content = content.replace(
-        f'DEVELOPMENT_TEAM = {TEAM_ID};',
-        f'DEVELOPMENT_TEAM = {TEAM_ID};\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "{PROFILE_UUID}";'
+        "DEVELOPMENT_TEAM = " + TEAM_ID + ";",
+        "CODE_SIGN_STYLE = Manual;\n\t\t\t\tDEVELOPMENT_TEAM = " + TEAM_ID + ";"
     )
+    print("Inserted CODE_SIGN_STYLE = Manual")
+else:
+    print("CODE_SIGN_STYLE = Manual already present")
 
-with open(PBXPROJ, "w") as f:
-    f.write(content)
+# c) Set PROVISIONING_PROFILE_SPECIFIER
+OLD_PPS = 'PROVISIONING_PROFILE_SPECIFIER = "";'
+NEW_PPS = f'PROVISIONING_PROFILE_SPECIFIER = "{PROFILE_UUID}";'
+n2 = content.count(OLD_PPS)
+if n2:
+    content = content.replace(OLD_PPS, NEW_PPS)
+    print(f"Replaced {n2} PROVISIONING_PROFILE_SPECIFIER (empty -> UUID)")
+elif PROFILE_UUID not in content:
+    # Add after DEVELOPMENT_TEAM
+    content = content.replace(
+        "DEVELOPMENT_TEAM = " + TEAM_ID + ";",
+        "DEVELOPMENT_TEAM = " + TEAM_ID + ";\n\t\t\t\t" + NEW_PPS
+    )
+    print("Inserted PROVISIONING_PROFILE_SPECIFIER")
+else:
+    print("PROVISIONING_PROFILE_SPECIFIER already correct")
 
-# Show AFTER state
-code_sign_lines_after = [l.strip() for l in content.splitlines()
-                         if any(k in l for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING"))]
-print("\nAFTER:")
-for l in code_sign_lines_after[:20]:
-    print(" ", l)
+with open(PBXPROJ, "w") as fh:
+    fh.write(content)
 
-print(f"\nManual occurrences: {content.count('CODE_SIGN_STYLE = Manual')}")
-print(f"{cert_identity} occurrences: {content.count(cert_identity)}")
-print(f"PROVISIONING_PROFILE_SPECIFIER ({PROFILE_UUID}): {'YES' if PROFILE_UUID in content else 'NO'}")
+# Show after
+print("\n--- AFTER ---")
+for ln in content.splitlines():
+    if any(k in ln for k in ("CODE_SIGN", "DEVELOPMENT_TEAM", "PROVISIONING")):
+        print("  ", ln.strip())
+
+print("\nManual occurrences:", content.count("CODE_SIGN_STYLE = Manual;"))
+print('"-" identity occurrences:', content.count('"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "-";'))
+print("UUID present:", PROFILE_UUID in content)
 print("=== Done ===")
