@@ -18,7 +18,7 @@
       "config": "ios-preview.yml",
       "ios": {
         "buildConfiguration": "Release",
-        "artifactPath": "ios/Airbuddies.ipa"
+        "applicationArchivePath": "ios/Airbuddies.ipa"
       }
     },
     "production": {
