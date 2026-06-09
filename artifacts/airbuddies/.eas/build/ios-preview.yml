@@ -2,6 +2,9 @@ build:
   name: iOS Preview (no frozen lockfile)
   steps:
     - eas/checkout
+    - run:
+        name: Remove Replit-format lockfile
+        command: rm -f pnpm-lock.yaml
     - eas/install_node_modules:
         inputs:
           install_command: pnpm install --no-frozen-lockfile
@@ -9,7 +12,7 @@ build:
         inputs:
           clean: true
     - run:
-        name: Re-sync lockfile after prebuild modifications
-        command: pnpm install --no-frozen-lockfile
+        name: Re-sync after prebuild
+        command: rm -f pnpm-lock.yaml && pnpm install --no-frozen-lockfile
     - eas/install_pods
     - eas/run_fastlane
