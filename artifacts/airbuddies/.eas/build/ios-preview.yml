@@ -95,3 +95,6 @@ build:
           echo "=== IPA files ==="
           ls -la "$EXPORT_DIR"/*.ipa || echo "No IPA found in $EXPORT_DIR"
           find /tmp -name "*.ipa" 2>/dev/null || true
+    - eas/upload_artifact:
+        name: Upload IPA
+        path: ios/Airbuddies.ipa
