@@ -21,34 +21,18 @@ build:
           rm -f ../../pnpm-lock.yaml || true
           pnpm install --no-frozen-lockfile
     - run:
-        name: Patch pbxproj and create Fastfile
+        name: Patch signing and install Fastfile
         command: |
           PBXPROJ="ios/Airbuddies.xcodeproj/project.pbxproj"
           echo "=== Bundle IDs ==="
           grep "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ" | sort -u
-          echo "=== Signing before ==="
+          echo "=== CODE_SIGN_STYLE before ==="
           grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
           python3 -c "f='ios/Airbuddies.xcodeproj/project.pbxproj';c=open(f).read();cnt=c.count('CODE_SIGN_STYLE = Manual');open(f,'w').write(c.replace('CODE_SIGN_STYLE = Manual','CODE_SIGN_STYLE = Automatic'));print('Replaced',cnt,'occurrences')"
-          echo "=== Signing after ==="
+          echo "=== CODE_SIGN_STYLE after ==="
           grep "CODE_SIGN_STYLE" "$PBXPROJ" | head -5
           mkdir -p ios/fastlane
-          cat > ios/fastlane/Fastfile << 'FASTFILE_EOF'
-default_platform(:ios)
-
-platform :ios do
-  lane :build do
-    gym(
-      scheme: "Airbuddies",
-      project: "./Airbuddies.xcodeproj",
-      configuration: "Release",
-      output_directory: ".",
-      output_name: "Airbuddies",
-      export_method: "ad-hoc",
-      xcargs: "-allowProvisioningUpdates"
-    )
-  end
-end
-FASTFILE_EOF
-          echo "=== Fastfile created ==="
+          cp .eas/Fastfile ios/fastlane/Fastfile
+          echo "=== Fastfile installed ==="
           cat ios/fastlane/Fastfile
     - eas/run_fastlane
