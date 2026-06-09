@@ -22,24 +22,27 @@ build:
         name: Inject DEVELOPMENT_TEAM into Xcode project
         command: |
           python3 - << 'PYEOF'
-          import re, sys
           path = 'ios/Airbuddies.xcodeproj/project.pbxproj'
           team = '72CS7BMND3'
           with open(path) as f:
-              content = f.read()
-          before = content.count('DEVELOPMENT_TEAM')
-          print(f'DEVELOPMENT_TEAM entries before: {before}')
-          if before > 0:
-              content = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', f'DEVELOPMENT_TEAM = {team};', content)
-              print('Replaced existing entries')
-          else:
-              content = re.sub(r'(CODE_SIGN_STYLE = [^\n;]+;)', rf'\1\n\t\t\t\tDEVELOPMENT_TEAM = {team};', content)
-              print('Added DEVELOPMENT_TEAM after CODE_SIGN_STYLE entries')
-          after = content.count('DEVELOPMENT_TEAM')
-          print(f'DEVELOPMENT_TEAM entries after: {after}')
+              lines = f.readlines()
+          before = sum(1 for l in lines if 'DEVELOPMENT_TEAM' in l)
+          print('DEVELOPMENT_TEAM lines before:', before)
+          out = []
+          added = 0
+          for line in lines:
+              out.append(line)
+              if 'CODE_SIGN_STYLE' in line and 'DEVELOPMENT_TEAM' not in line:
+                  ws = len(line) - len(line.lstrip('\t '))
+                  out.append(line[:ws] + 'DEVELOPMENT_TEAM = ' + team + ';\n')
+                  added += 1
+          result = ''.join(out)
+          after = result.count('DEVELOPMENT_TEAM')
+          print('Added entries:', added)
+          print('DEVELOPMENT_TEAM lines after:', after)
           with open(path, 'w') as f:
-              f.write(content)
-          print('pbxproj updated successfully')
+              f.write(result)
+          print('Done' if after > 0 else 'WARNING: no entries added')
           PYEOF
     - run:
         name: Disable xcpretty for visible errors
