@@ -1,18 +1,28 @@
 build:
-  name: iOS Preview (no frozen lockfile)
+  name: iOS Preview
   steps:
     - eas/checkout
     - run:
-        name: Remove Replit-format lockfile
-        command: rm -f pnpm-lock.yaml
-    - eas/install_node_modules:
-        inputs:
-          install_command: pnpm install --no-frozen-lockfile
+        name: Debug and remove incompatible lockfile
+        command: |
+          echo "=== PWD: $PWD ==="
+          echo "=== Searching for pnpm-lock.yaml ==="
+          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "none found via find"
+          ls pnpm-lock.yaml 2>/dev/null && echo "lockfile AT ROOT" || echo "no lockfile at root"
+          ls ../../pnpm-lock.yaml 2>/dev/null && echo "lockfile TWO LEVELS UP" || echo "not two levels up"
+          find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
+          echo "=== After deletion ==="
+          find . -maxdepth 5 -name "pnpm-lock.yaml" 2>/dev/null || echo "lockfile removed"
+    - run:
+        name: Install node modules (fresh lockfile)
+        command: pnpm install --no-frozen-lockfile
     - eas/prebuild:
         inputs:
           clean: true
     - run:
-        name: Re-sync after prebuild
-        command: rm -f pnpm-lock.yaml && pnpm install --no-frozen-lockfile
+        name: Post-prebuild reinstall
+        command: |
+          find . -maxdepth 5 -name "pnpm-lock.yaml" -delete 2>/dev/null || true
+          pnpm install --no-frozen-lockfile
     - eas/install_pods
     - eas/run_fastlane
