@@ -22,10 +22,7 @@ build:
         name: Disable xcpretty for visible errors
         command: |
           mkdir -p ios/fastlane
-          # Gymfile settings are read by gym action in the Fastfile
-          cat > ios/fastlane/Gymfile << 'GYMEOF'
-disable_xcpretty true
-GYMEOF
-          echo "=== Created Gymfile ==="
+          printf 'disable_xcpretty true\n' > ios/fastlane/Gymfile
+          echo "=== Gymfile created ==="
           cat ios/fastlane/Gymfile
     - eas/run_fastlane
